@@ -1,0 +1,142 @@
+/* ---------- обложка вечера ---------- */
+.cover { position: relative; height: 250px; flex: none; overflow: hidden; background: #2a2622; }
+.cover .img2 { position: absolute; inset: 0; background-position: center 30%; background-size: cover; }
+.cover .grad {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(14, 12, 10, 0.86) 0%, rgba(14, 12, 10, 0.5) 34%, rgba(14, 12, 10, 0.06) 62%, rgba(14, 12, 10, 0.28) 100%);
+}
+.cover .txt { position: absolute; left: 16px; right: 16px; bottom: 14px; color: #fff; }
+.cover .t { font-size: 24px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; }
+.cover .l { font-size: 11.5px; opacity: 0.9; margin-top: 5px; }
+.cover .c { font-size: 11px; opacity: 0.85; margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+.dot-ok { width: 6px; height: 6px; border-radius: 50%; background: #5fd39a; display: inline-block; }
+.cover .bar2 { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; z-index: 3; }
+.cover .rb {
+  width: 32px; height: 32px; border-radius: 50%; background: rgba(22, 20, 17, 0.42);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600;
+}
+
+/* ---------- вкладки ---------- */
+.tabs { display: flex; flex: none; height: 44px; background: var(--panel); border-bottom: 1px solid var(--line); padding: 0 6px; }
+.tab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 12.5px; color: var(--mut); position: relative; background: none; border: 0; cursor: pointer;
+}
+.tab b { font-weight: 650; font-size: 11px; color: #a29d93; font-variant-numeric: tabular-nums; }
+.tab.on { color: var(--ink); font-weight: 650; }
+.tab.on b { color: var(--ink); }
+.tab.on::after {
+  content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px;
+  background: var(--ink); border-radius: 1px;
+}
+
+/* ---------- периоды вечера ---------- */
+.strip { flex: none; background: var(--panel); padding: 12px 14px 8px; border-bottom: 1px solid var(--line); }
+.chips { display: flex; gap: 6px; }
+.chip2 {
+  flex: 1; padding: 6px 8px; border-radius: 11px; background: var(--chip); font-size: 10.5px;
+  color: #5c5a55; font-weight: 600; text-align: center; line-height: 1.25;
+  border: 0; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.chip2 b { display: block; font-size: 13.5px; font-weight: 650; color: var(--ink); margin-top: 1px; font-variant-numeric: tabular-nums; }
+.chip2.on { background: var(--ink); color: rgba(255, 255, 255, 0.72); }
+.chip2.on b { color: #fff; }
+.hint2 { display: flex; align-items: center; justify-content: space-between; margin-top: 9px; font-size: 10.5px; color: var(--mut); }
+.hint2 .fake { color: var(--acc); font-weight: 600; background: none; border: 0; cursor: pointer; padding: 0; }
+
+/* ---------- сетка ---------- */
+.feed { flex: 1; overflow-y: auto; background: var(--panel); padding: 0 12px 8px; position: relative; }
+.feed::-webkit-scrollbar { width: 0; }
+.glab {
+  font-size: 10.5px; color: #8d8a83; margin: 10px 0 5px; font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; gap: 7px;
+}
+.glab::after { content: ""; flex: 1; height: 1px; background: #efeae0; }
+.row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.th {
+  position: relative; padding-top: 133.33%; border-radius: 4px; overflow: hidden;
+  background: #eae5da; border: 0; cursor: pointer; padding-left: 0; padding-right: 0;
+  display: block; width: 100%;
+}
+.th .im { position: absolute; inset: 0; background-size: cover; }
+.th .g {
+  position: absolute; left: 4px; bottom: 4px; background: rgba(20, 18, 15, 0.62); color: #fff;
+  font-size: 8.5px; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: 0.02em;
+}
+.th .sel {
+  position: absolute; left: 4px; top: 4px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--ink); color: #fff; font-size: 9px; display: flex; align-items: center;
+  justify-content: center; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.th .lk {
+  position: absolute; right: 4px; top: 4px; font-size: 8.5px; color: #fff;
+  background: rgba(20, 18, 15, 0.55); border-radius: 4px; padding: 1px 4px;
+  font-variant-numeric: tabular-nums;
+}
+.th.picked::after { content: ""; position: absolute; inset: 0; border: 2px solid var(--ink); border-radius: 4px; }
+
+/* ---------- нижняя панель ---------- */
+.foot {
+  flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px 16px;
+  background: rgba(255, 253, 250, 0.96); border-top: 1px solid var(--line);
+}
+.foot .ghost2 {
+  height: 38px; padding: 0 15px; border-radius: 99px; background: var(--soft); color: #26282c;
+  font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 6px;
+  border: 0; cursor: pointer;
+}
+.foot .cnt { font-size: 11px; color: var(--mut); margin-left: 2px; }
+.foot .dl {
+  margin-left: auto; width: 42px; height: 42px; border-radius: 50%; background: var(--ink); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600;
+  border: 0; cursor: pointer;
+}
+
+/* ---------- лайтбокс ---------- */
+.lb { position: absolute; inset: 0; z-index: 60; background: #0f0e0c; display: flex; flex-direction: column; }
+.lb .ph {
+  flex: 1; margin: 0; background-size: cover; background-position: center;
+  transition: background-image 0.15s linear;
+}
+.lb .top3 {
+  position: absolute; top: 0; left: 0; right: 0; padding: 12px; display: flex;
+  justify-content: space-between; z-index: 2;
+}
+.lb .meta {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 16px; color: #fff;
+  background: linear-gradient(to top, rgba(10, 9, 8, 0.9), rgba(10, 9, 8, 0));
+}
+.lb .meta .t { font-size: 13px; font-weight: 650; }
+.lb .meta .s { font-size: 11px; opacity: 0.72; margin-top: 3px; }
+.lb .acts { display: flex; gap: 8px; margin-top: 13px; }
+.lb .acts button {
+  flex: 1; height: 40px; border-radius: 11px; border: 0; font-size: 12px; font-weight: 650;
+  background: rgba(255, 255, 255, 0.14); color: #fff; cursor: pointer;
+}
+.lb .acts button.liked { background: #fff; color: var(--ink); }
+.lb .nav {
+  position: absolute; top: 45%; width: 36px; height: 36px; border-radius: 50%;
+  border: 0; background: rgba(255, 255, 255, 0.16); color: #fff; font-size: 16px; cursor: pointer;
+}
+.lb .nav.l { left: 10px; }
+.lb .nav.r { right: 10px; }
+
+/* ---------- лист «ссылка и QR» ---------- */
+.scrim { position: absolute; inset: 0; background: rgba(18, 16, 13, 0.42); z-index: 55; border: 0; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 58; background: var(--panel);
+  border-radius: 22px 22px 0 0; box-shadow: 0 -12px 40px rgba(14, 12, 10, 0.35);
+  padding: 8px 18px 20px; display: flex; flex-direction: column; align-items: center;
+}
+.sheet .grab { width: 38px; height: 4px; border-radius: 2px; background: #ddd8cd; margin: 2px auto 12px; }
+.sheet .st { font-size: 14px; font-weight: 650; }
+.sheet .qrw { margin: 14px 0 10px; padding: 8px; background: #fff; border-radius: 14px; border: 1px solid var(--line); }
+.sheet .qrw img { display: block; border-radius: 6px; }
+.sheet .lnk { font-size: 12px; color: #3f3d38; }
+.sheet .row2 { display: flex; gap: 8px; width: 100%; margin-top: 14px; }
+.sheet .row2 button { flex: 1; height: 44px; border-radius: 12px; border: 0; font-size: 13px; font-weight: 650; }
+.sheet .row2 .primary { background: var(--ink); color: #fff; }
+.sheet .row2 .ghost2 { background: var(--soft); color: #26282c; }
+.sheet .hint3 { font-size: 10.5px; color: #8d8a83; margin-top: 11px; text-align: center; line-height: 1.45; }
+.sheet .q3 { margin-top: 12px; width: 100%; }
