@@ -30,67 +30,75 @@ const IMGS = [
   'p3', 'vp4', 'vl7', 'p1', 'vp8', 'vl4', 'p5', 'vl8',
 ];
 
-const START = 19 * 60;
-const END = 26 * 60;
-
-export const periods: Period[] = [
-  { id: 'a', label: '19–21', count: 34, from: START, to: 21 * 60 },
-  { id: 'b', label: '21–23', count: 60, from: 21 * 60, to: 23 * 60 },
-  { id: 'c', label: '23–01', count: 54, from: 23 * 60, to: 25 * 60 },
-  { id: 'd', label: '01–02', count: 20, from: 25 * 60, to: END },
-];
-
 const fmt = (minutes: number) => {
   const m = Math.round(minutes) % (24 * 60);
   const h = Math.floor(m / 60);
   return `${String(h).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 };
 
-const total = 168;
+/** «11 июля, 19:00–02:00» → минуты от полуночи, конец переезжает через полночь. */
+const parseWindow = (when: string) => {
+  const m = when.match(/(\d{1,2}):(\d{2})\D+(\d{1,2}):(\d{2})/);
+  if (!m) return { from: 19 * 60, to: 26 * 60 };
+  const from = Number(m[1]) * 60 + Number(m[2]);
+  let to = Number(m[3]) * 60 + Number(m[4]);
+  while (to <= from) to += 24 * 60;
+  return { from, to };
+};
 
-const BOUNDS = [
-  { from: 19 * 60, to: 21 * 60, n: 34 },
-  { from: 21 * 60, to: 23 * 60, n: 60 },
-  { from: 23 * 60, to: 25 * 60, n: 54 },
-  { from: 25 * 60, to: 26 * 60, n: 20 },
-];
+/** Вечер режется на двухчасовые куски, последний — до конца. */
+const bucketsOf = (from: number, to: number) => {
+  const out: { from: number; to: number }[] = [];
+  for (let b = from; b < to; b += 120) out.push({ from: b, to: Math.min(b + 120, to) });
+  return out;
+};
 
-const timeAt = (i: number) => {
+const splitByTime = (n: number, from: number, to: number) => {
+  const list = bucketsOf(from, to);
+  const total = to - from;
   let acc = 0;
-  for (const b of BOUNDS) {
-    if (i < acc + b.n) return b.from + ((i - acc) * (b.to - b.from)) / b.n;
-    acc += b.n;
-  }
-  return END;
+  return list.map((b, i) => {
+    const count =
+      i === list.length - 1
+        ? n - acc
+        : Math.round((n * (b.to - b.from)) / total);
+    acc += count;
+    return { ...b, count: Math.max(0, count) };
+  });
 };
 
-export const photos: Photo[] = Array.from({ length: total }, (_, i) => {
-  const minute = timeAt(i);
-  const isGuest = i % 7 === 2 || i % 7 === 4 || i % 7 === 6;
-  return {
-    id: i,
-    img: asset(`/img/${IMGS[i % IMGS.length]}.png`),
-    time: fmt(minute),
-    hour: Math.floor(minute / 60),
-    source: isGuest ? 'guest' : 'photo',
-    likes: (i * 37) % 47,
-    pos: `${20 + ((i * 13) % 60)}% ${25 + ((i * 17) % 50)}%`,
-    period: i < 34 ? 'a' : i < 94 ? 'b' : i < 148 ? 'c' : 'd',
-  };
-});
-
-export const event = {
-  id: '7kd2qf9xm',
-  title: 'Свадьба Ани',
-  venue: 'Лофт «Красный Октябрь»',
-  date: '11 июля, суббота',
-  window: '19:00–02:00',
-  counts: { all: 168, photographer: 96, guests: 72 },
-  sources: 24,
-  cover: asset('/img/big.png'),
-  city: 'Москва',
-  wasThere: '21:40',
+export const makePhotos = (n: number, from: number, to: number): Photo[] => {
+  const out: Photo[] = [];
+  splitByTime(n, from, to).forEach((b, bi) => {
+    for (let k = 0; k < b.count; k += 1) {
+      const i = out.length;
+      const minute = b.from + ((k + 0.5) * (b.to - b.from)) / b.count;
+      const isGuest = i % 7 === 2 || i % 7 === 4 || i % 7 === 6;
+      out.push({
+        id: i,
+        img: asset(`/img/${IMGS[i % IMGS.length]}.png`),
+        time: fmt(minute),
+        hour: Math.floor(minute / 60),
+        source: isGuest ? 'guest' : 'photo',
+        likes: (i * 37) % 47,
+        pos: `${20 + ((i * 13) % 60)}% ${25 + ((i * 17) % 50)}%`,
+        period: `p${bi}`,
+      });
+    }
+  });
+  return out;
 };
+
+const periodsFor = (n: number, from: number, to: number): Period[] =>
+  splitByTime(n, from, to)
+    .map((b, i) => ({
+      id: `p${i}`,
+      label: `${fmt(b.from)}–${fmt(b.to)}`,
+      count: b.count,
+      from: b.from,
+      to: b.to,
+    }))
+    .filter((p) => p.count > 0);
 
 export type MapEvent = {
   id: string;
@@ -176,6 +184,44 @@ export const mapEvents: MapEvent[] = [
     locked: true,
   },
 ];
+
+export type Ev = {
+  id: string;
+  title: string;
+  venue: string;
+  date: string;
+  window: string;
+  counts: { all: number; photographer: number; guests: number };
+  sources: number;
+  cover: string;
+  city: string;
+  wasThere: string;
+  photos: Photo[];
+  periods: Period[];
+};
+
+/** Данные вечера по id: счётчики, куски вечера и кадры под них. */
+export function eventFor(id: string): Ev {
+  const m = mapEvents.find((e) => e.id === id) ?? mapEvents[0];
+  const n = m.frames > 0 ? m.frames : 168;
+  const { from, to } = parseWindow(m.when);
+  const [datePart, timePart] = m.when.split(', ');
+  const photographer = Math.round((n * 4) / 7);
+  return {
+    id: m.id,
+    title: m.title,
+    venue: m.venue,
+    date: datePart,
+    window: timePart,
+    counts: { all: n, photographer, guests: n - photographer },
+    sources: m.sources || 7,
+    cover: m.id === '7kd2qf9xm' ? asset('/img/big.png') : m.img,
+    city: 'Москва',
+    wasThere: '21:40',
+    photos: makePhotos(n, from, to),
+    periods: periodsFor(n, from, to),
+  };
+}
 
 export const cabinet = {
   name: 'Аня Смирнова',

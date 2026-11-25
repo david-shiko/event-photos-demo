@@ -3,11 +3,12 @@
 import { useMemo, useState } from 'react';
 import Lightbox from './Lightbox';
 import Shell from './Shell';
-import { asset, event, frames, periods, photos, sources, type Photo } from '@/lib/data';
+import { asset, eventFor, frames, sources, type Photo } from '@/lib/data';
 
 type Tab = 'all' | 'photo' | 'guest';
 
-export default function EventView() {
+export default function EventView({ id }: { id: string }) {
+  const event = useMemo(() => eventFor(id), [id]);
   const [tab, setTab] = useState<Tab>('all');
   const [period, setPeriod] = useState<string | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
@@ -17,12 +18,12 @@ export default function EventView() {
 
   const list = useMemo(
     () =>
-      photos.filter(
+      event.photos.filter(
         (p) =>
           (tab === 'all' || (tab === 'photo' && p.source === 'photo') || (tab === 'guest' && p.source === 'guest')) &&
           (!period || p.period === period),
       ),
-    [tab, period],
+    [tab, period, event],
   );
 
   const toggle = (id: number) =>
@@ -78,7 +79,7 @@ export default function EventView() {
 
       <div className="strip">
         <div className="chips">
-          {periods.map((p) => (
+          {event.periods.map((p) => (
             <button
               key={p.id}
               className={`chip2 ${period === p.id ? 'on' : ''}`}

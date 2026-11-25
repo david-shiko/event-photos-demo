@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import Shell from './Shell';
-import { asset, frames, mapEvents, event, sources } from '@/lib/data';
+import { asset, frames, mapEvents, sources } from '@/lib/data';
 
 type Filter = 'all' | 'near' | 'photo' | 'video';
 
@@ -18,7 +18,7 @@ const VIDEO = ['vinzavod', 'kassety'];
 
 export default function MapView() {
   const [filter, setFilter] = useState<Filter>('all');
-  const [picked, setPicked] = useState(event.id);
+  const [picked, setPicked] = useState('7kd2qf9xm');
   const [sheet, setSheet] = useState(false);
   const [asked, setAsked] = useState(false);
 
@@ -48,7 +48,7 @@ export default function MapView() {
 
         <div className="maphead">
           <div className="mpills">
-            <span className="city">◷ {`${event.city} · 11 июля`}</span>
+            <span className="city">◷ Москва · 11 июля</span>
             <span className="me">◎</span>
           </div>
           <div className="mchips">
