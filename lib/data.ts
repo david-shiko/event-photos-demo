@@ -48,8 +48,24 @@ const fmt = (minutes: number) => {
 
 const total = 168;
 
+const BOUNDS = [
+  { from: 19 * 60, to: 21 * 60, n: 34 },
+  { from: 21 * 60, to: 23 * 60, n: 60 },
+  { from: 23 * 60, to: 25 * 60, n: 54 },
+  { from: 25 * 60, to: 26 * 60, n: 20 },
+];
+
+const timeAt = (i: number) => {
+  let acc = 0;
+  for (const b of BOUNDS) {
+    if (i < acc + b.n) return b.from + ((i - acc) * (b.to - b.from)) / b.n;
+    acc += b.n;
+  }
+  return END;
+};
+
 export const photos: Photo[] = Array.from({ length: total }, (_, i) => {
-  const minute = START + (i * (END - START)) / total;
+  const minute = timeAt(i);
   const isGuest = i % 7 === 2 || i % 7 === 4 || i % 7 === 6;
   return {
     id: i,
@@ -59,7 +75,7 @@ export const photos: Photo[] = Array.from({ length: total }, (_, i) => {
     source: isGuest ? 'guest' : 'photo',
     likes: (i * 37) % 47,
     pos: `${20 + ((i * 13) % 60)}% ${25 + ((i * 17) % 50)}%`,
-    period: periods.find((p) => minute >= p.from && minute < p.to)?.id ?? 'a',
+    period: i < 34 ? 'a' : i < 94 ? 'b' : i < 148 ? 'c' : 'd',
   };
 });
 

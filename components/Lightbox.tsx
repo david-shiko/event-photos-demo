@@ -23,6 +23,7 @@ export default function Lightbox({
 
   return (
     <div className="lb">
+      <div className="bg" style={{ backgroundImage: `url(${photo.img})` }} />
       <div className="ph" style={{ backgroundImage: `url(${photo.img})` }} />
       <div className="top3">
         <button className="rb" onClick={onClose} aria-label="Закрыть">
