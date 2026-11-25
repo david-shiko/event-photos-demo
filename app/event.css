@@ -139,8 +139,17 @@
 .sheet .qrw img { display: block; border-radius: 6px; }
 .sheet .lnk { font-size: 12px; color: #3f3d38; }
 .sheet .row2 { display: flex; gap: 8px; width: 100%; margin-top: 14px; }
-.sheet .row2 button { flex: 1; height: 44px; border-radius: 12px; border: 0; font-size: 13px; font-weight: 650; }
+.sheet .row2 > * {
+  flex: 1; height: 44px; border-radius: 12px; border: 0; font-size: 13px; font-weight: 650;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; font-family: inherit;
+}
 .sheet .row2 .primary { background: var(--ink); color: #fff; }
 .sheet .row2 .ghost2 { background: var(--soft); color: #26282c; }
 .sheet .hint3 { font-size: 10.5px; color: #8d8a83; margin-top: 11px; text-align: center; line-height: 1.45; }
 .sheet .q3 { margin-top: 12px; width: 100%; }
+
+.sheet .rep { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.sheet .rep div { background: var(--soft); border-radius: 12px; padding: 10px 11px; }
+.sheet .rep b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.sheet .rep span { font-size: 10.5px; color: var(--mut); }
+.sheet .reph { font-size: 11px; color: var(--mut); line-height: 1.5; margin-top: 12px; }

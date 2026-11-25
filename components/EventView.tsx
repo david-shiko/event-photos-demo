@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Lightbox from './Lightbox';
 import Shell from './Shell';
 import { asset, eventFor, frames, sources, type Photo } from '@/lib/data';
+import { useCopy } from '@/lib/client';
 
 type Tab = 'all' | 'photo' | 'guest';
 
@@ -15,6 +16,7 @@ export default function EventView({ id }: { id: string }) {
   const [selecting, setSelecting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const [sheet, setSheet] = useState(false);
+  const { done: copied, copy } = useCopy();
 
   const list = useMemo(
     () =>
@@ -149,10 +151,14 @@ export default function EventView({ id }: { id: string }) {
             <div className="qrw">
               <img src={asset('/img/qr.png')} width={168} height={168} alt="QR вечера" />
             </div>
-            <div className="lnk">event.photos/s/7kd2qf9xm</div>
+            <div className="lnk">event.photos/s/{event.id}</div>
             <div className="row2">
-              <button className="primary">Скопировать</button>
-              <button className="ghost2">Скачать QR</button>
+              <button className="primary" onClick={() => copy(`https://event.photos/s/${event.id}`)}>
+                {copied ? 'Скопировано ✓' : 'Скопировать'}
+              </button>
+              <a className="ghost2" href={asset('/img/qr.png')} download="vecher-qr.png">
+                Скачать QR
+              </a>
             </div>
             <div className="hint3">
               Гости открывают без регистрации и приложения.

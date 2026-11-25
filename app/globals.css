@@ -98,6 +98,9 @@ button { font-family: inherit; }
 .menu .in a:last-of-type { border-bottom: 0; }
 .menu .in .sub { font-size: 11px; color: var(--mut); margin-top: 12px; }
 
+/* на десктопе навигация есть в боковой панели */
+@media (min-width: 861px) { .fab { display: none; } }
+
 @media (max-width: 860px) {
   body { background: var(--bg); }
   .demo { display: block; padding: 0; min-height: 0; }
@@ -298,8 +301,8 @@ button { font-family: inherit; }
 }
 .cab .ev .st.draft { background: #f2eee5; color: #7a7365; }
 .cab .ev .r2 {
-  display: flex; gap: 12px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--soft);
-  font-size: 10.5px; color: #3f3d38;
+  display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; padding-top: 9px;
+  border-top: 1px solid var(--soft); font-size: 10.5px; color: #3f3d38;
 }
 .cab .ev .r2 span b { font-weight: 650; font-variant-numeric: tabular-nums; }
 .cab .ev .money { margin-left: auto; color: var(--mut); }
@@ -307,6 +310,9 @@ button { font-family: inherit; }
 .cab .pay .t { font-size: 12.5px; font-weight: 650; }
 .cab .pay .d { font-size: 11px; color: var(--mut); margin-top: 3px; line-height: 1.45; }
 .cab .pay .b { display: flex; gap: 8px; margin-top: 11px; }
-.cab .pay .b button { flex: 1; height: 36px; border-radius: 10px; border: 0; font-size: 12px; font-weight: 650; }
+.cab .pay .b > * {
+  flex: 1; height: 36px; border-radius: 10px; border: 0; font-size: 12px; font-weight: 650;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; font-family: inherit;
+}
 .cab .pay .b .p { background: var(--ink); color: #fff; }
 .cab .pay .b .s { background: var(--soft); color: #26282c; }

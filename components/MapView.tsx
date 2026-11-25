@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import Shell from './Shell';
 import { asset, frames, mapEvents, sources } from '@/lib/data';
+import { useCopy } from '@/lib/client';
 
 type Filter = 'all' | 'near' | 'photo' | 'video';
 
@@ -21,6 +22,7 @@ export default function MapView() {
   const [picked, setPicked] = useState('7kd2qf9xm');
   const [sheet, setSheet] = useState(false);
   const [asked, setAsked] = useState(false);
+  const { done: copied, copy } = useCopy();
 
   const visible = mapEvents.filter((e) => {
     if (filter === 'near') return e.y > 40;
@@ -150,10 +152,14 @@ export default function MapView() {
             <div className="qrw">
               <img src={asset('/img/qr.png')} width={168} height={168} alt="QR вечера" />
             </div>
-            <div className="lnk">event.photos/s/7kd2qf9xm</div>
+            <div className="lnk">event.photos/s/{current.id}</div>
             <div className="row2">
-              <button className="primary">Скопировать</button>
-              <button className="ghost2">Скачать QR</button>
+              <button className="primary" onClick={() => copy(`https://event.photos/s/${current.id}`)}>
+                {copied ? 'Скопировано ✓' : 'Скопировать'}
+              </button>
+              <a className="ghost2" href={asset('/img/qr.png')} download="vecher-qr.png">
+                Скачать QR
+              </a>
             </div>
             <div className="hint3">
               QR печатают на карточках и ставят на столах.

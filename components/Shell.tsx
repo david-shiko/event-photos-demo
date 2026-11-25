@@ -8,6 +8,7 @@ const NAV = [
   { href: '/e/7kd2qf9xm/', label: 'Вечер', icon: '2' },
   { href: '/u/', label: 'Загрузка', icon: '3' },
   { href: '/photographer/', label: 'Кабинет', icon: '4' },
+  { href: '/new/', label: 'Новый вечер', icon: '5' },
 ];
 
 export default function Shell({
