@@ -17,7 +17,8 @@ export const state = (page) =>
       clock: document.querySelector('.mhtime')?.textContent ?? '',
       pins: document.querySelectorAll('.lpin').length,
       empty: !!document.querySelector('.mempty'),
-      card: document.querySelector('.mcard .t')?.textContent ?? null,
+      card: document.querySelector('.pincard .pt')?.textContent ?? null,
+      panelCard: !!document.querySelector('.mbottom .mcard'),
     };
   });
 
@@ -33,6 +34,7 @@ export default [
       await h.go('/');
       await h.waitFor(() => !!document.querySelector('.raildot'), 15000, 'лента суток');
       const a = await state(h.page);
+      h.ok(!a.panelCard, 'над лентой снова висит карточка вечера — по дизайну её там нет');
       const box = await h.boxOf(h.page, '.railscroll');
       await h.dragX(box, -240);
       const b = await state(h.page);
@@ -99,7 +101,7 @@ export default [
       await h.sleep(1100);
       const s = await state(h.page);
       h.ok(!s.empty, 'после «к нему» пустое состояние не ушло');
-      h.ok(!!s.card, 'после «к нему» нет открытого вечера');
+      h.ok(s.pins > 0 || s.card, 'после «к нему» на карте нет ни вечера, ни карточки');
       h.ok(s.railDay >= 4, `лента не переехала на день вечера (день ${s.railDay})`);
       h.near(mins(s.clock), mins(s.railClock), 6, 'шапка и лента после «к нему»');
     },
@@ -132,26 +134,70 @@ export default [
     },
   },
   {
+    name: 'стопка: пять вечеров в одном адресе',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => !!document.querySelector('.lstack'), 45000, 'стопка пинов');
+      await h.click(h.page, '.lstack');
+      await h.waitFor(() => !!document.querySelector('.sheet.clist'), 6000, 'лист стопки');
+      const rows = await h.page.$$eval('.sheet.clist .srow', (els) => els.length);
+      h.eq(rows, 5, 'строк в листе стопки');
+      const title = await h.page.$eval('.sheet.clist .srow b', (el) => el.textContent);
+      await h.click(h.page, '.sheet.clist .srow');
+      await h.sleep(900);
+      const s = await state(h.page);
+      h.eq(s.card, title, 'карточка вечера из стопки');
+      h.ok(!(await h.page.$('.sheet.clist')), 'лист стопки не закрылся');
+    },
+  },
+  {
+    name: 'дальний зум: герой-пин',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin').length > 0, 45000, 'пины на карте');
+      const box = await h.boxOf(h.page, '.lmap');
+      await h.page.mouse.move(box.x + box.w / 2, box.y + box.h / 2);
+      for (let i = 0; i < 6; i++) {
+        await h.page.mouse.wheel({ deltaY: 400 });
+        await h.sleep(220);
+      }
+      await h.waitFor(() => !!document.querySelector('.lhero'), 6000, 'герой-пин на дальнем зуме');
+      const shown = await h.page.$$eval('.lpin:not(.hide)', (els) => els.length);
+      h.eq(shown, 0, 'обычные пины на дальнем зуме');
+      await h.click(h.page, '.lhero');
+      await h.waitFor(() => !document.querySelector('.lhero'), 8000, 'возврат к обычным пинам');
+    },
+  },
+  {
+    name: 'ссылка: ?pin= раскрывает пин',
+    run: async (h) => {
+      await h.go('/?pin=vinzavod');
+      await h.waitFor(
+        () => document.querySelector('.pincard .pt')?.textContent === 'Открытие «Винзавода»',
+        45000,
+        'карточка по ссылке',
+      );
+    },
+  },
+  {
     name: 'пин: клик открывает вечер',
     run: async (h) => {
       await h.go('/');
       await h.waitFor(() => document.querySelectorAll('.lpin').length > 0, 45000, 'пины на карте');
+      /* берём пин, по которому реально попадает курсор: шапка и панель его не закрывают */
       const pin = await h.page.evaluate(() => {
-        const top = document.querySelector('.mhead').getBoundingClientRect().bottom + 8;
-        const bottom = document.querySelector('.mbottom').getBoundingClientRect().top - 8;
-        const list = [...document.querySelectorAll('.lpin')].map((el) => {
+        const list = [...document.querySelectorAll('.lpin:not(.hide)')];
+        for (const el of list) {
           const r = el.getBoundingClientRect();
-          return { r, name: el.querySelector('.nm')?.textContent ?? '' };
-        });
-        const hit = list.find(({ r }) => r.y > top && r.y < bottom);
-        if (!hit) return null;
-        return {
-          x: hit.r.x + hit.r.width / 2,
-          y: hit.r.y + hit.r.height / 2,
-          name: hit.name,
-        };
+          const x = r.x + r.width / 2;
+          const y = r.y + r.height / 2;
+          const top = document.elementFromPoint(x, y);
+          if (!top || !el.contains(top)) continue;
+          return { x, y, name: el.querySelector('.nm')?.textContent ?? '' };
+        }
+        return null;
       });
-      h.ok(!!pin, 'ни один пин не виден между шапкой и панелью');
+      h.ok(!!pin, 'ни по одному пину нельзя попасть: их закрывают шапка и панель');
       await h.page.mouse.click(pin.x, pin.y);
       await h.sleep(700);
       const s = await state(h.page);

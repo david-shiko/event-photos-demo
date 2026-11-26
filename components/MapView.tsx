@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Shell from './Shell';
 import LiveMap from './LiveMap';
 import DayStrip from './DayStrip';
 import TimeRail from './TimeRail';
-import { asset, clockOf, DAYS, eventSpan, frames, mapEvents, plural, sources } from '@/lib/data';
+import { asset, clockOf, DAYS, eventSpan, frames, mapEvents, plural, sources, type MapEvent } from '@/lib/data';
 import { useCopy } from '@/lib/client';
 
 const NOW = 1440 + 21 * 60 + 40; // 11 июля, 21:40 — «сейчас» в демо
@@ -17,10 +16,10 @@ const TAIL = 30; // минут после конца, когда пин ещё �
 
 export default function MapView() {
   const [chosen, setChosen] = useState(NOW);
-  const [picked, setPicked] = useState('7kd2qf9xm');
+  const [picked, setPicked] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [cluster, setCluster] = useState<MapEvent[] | null>(null);
   const [sheet, setSheet] = useState(false);
-  const [asked, setAsked] = useState(false);
   const { done: copied, copy } = useCopy();
 
   const clock = clockOf(chosen);
@@ -40,13 +39,24 @@ export default function MapView() {
     .filter((s) => s.end < chosen)
     .sort((a, b) => b.end - a.end)[0];
 
-  const current =
-    mapEvents.find((e) => e.id === picked && shown.some((s) => s.id === picked)) ??
-    shown[0] ??
-    mapEvents[0];
+  const current = mapEvents.find((e) => e.id === picked) ?? shown[0] ?? mapEvents[0];
 
   const ready = dayEvents.filter((e) => e.frames > 0);
   const people = dayEvents.reduce((s, e) => s + e.sources, 0);
+
+  /* приход по ссылке: ?pin=<id> — карта подъезжает, пин раскрыт */
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('pin');
+    if (!id || !mapEvents.some((e) => e.id === id)) return;
+    setPicked(id);
+    setOpen(true);
+  }, []);
+
+  const pickPin = (id: string) => {
+    setPicked(id);
+    setOpen(true);
+    setCluster(null);
+  };
 
   return (
     <Shell
@@ -64,11 +74,11 @@ export default function MapView() {
         <LiveMap
           events={shown}
           dim={dim}
-          activeId={current.id}
-          onPick={(id) => {
-            setPicked(id);
-            setOpen(false);
-          }}
+          activeId={open ? picked : null}
+          open={open}
+          onPick={pickPin}
+          onCollapse={() => setOpen(false)}
+          onCluster={(items) => setCluster(items)}
         />
 
         <div className="mhead">
@@ -87,63 +97,9 @@ export default function MapView() {
         </div>
 
         <div className="mbottom">
-          {shown.length > 0 ? (
-            <div className={`mcard ${open ? 'open' : ''}`}>
-              <button className="grab" onClick={() => setOpen(!open)} aria-label="Развернуть карточку" />
-              <div className="row" onClick={() => setOpen(!open)}>
-                <div className="cv" style={{ backgroundImage: `url(${current.img})` }} />
-                <div className="meta">
-                  <div className="t">{current.title}</div>
-                  <div className="l">
-                    {current.venue} · {current.when.split(', ')[1]}
-                  </div>
-                  <div className="s">
-                    {current.soon ? (
-                      <>◷ вечер начнётся в {current.when.split(', ')[1].split('–')[0]}</>
-                    ) : (
-                      <>
-                        <span className="dot-ok" />
-                        {frames(current.frames)} · {sources(current.sources)}
-                      </>
-                    )}
-                  </div>
-                </div>
-                <span className="chev">{open ? '⌄' : '⌃'}</span>
-              </div>
-
-              {open && !current.soon && (
-                <div className="thumbs">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      style={{ backgroundImage: `url(${asset(`/img/p${(i % 8) + 1}.png`)})` }}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {open && (
-                <div className="btns">
-                  {current.soon ? (
-                    <button className="ghost" onClick={() => setAsked(true)}>
-                      {asked ? 'напомним' : 'напомнить о начале'}
-                    </button>
-                  ) : (
-                    <Link className="cta" href={`/e/${current.id}/`}>
-                      Открыть вечер
-                    </Link>
-                  )}
-                  <button className="ghost" onClick={() => setSheet(true)}>
-                    Ссылка
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
+          {shown.length === 0 && (
             <div className="mempty">
-              <b>
-                {clock.time} — пока пусто
-              </b>
+              <b>{clock.time} — пока пусто</b>
               <span>
                 {next
                   ? `Ближайший — «${next.e.title}» в ${clockOf(next.start).time}`
@@ -172,13 +128,34 @@ export default function MapView() {
             now={NOW}
             events={mapEvents}
             onChange={setChosen}
-            onEvent={(id) => {
-              setPicked(id);
-              setOpen(false);
-            }}
+            onEvent={pickPin}
           />
         </div>
       </div>
+
+      {cluster && (
+        <>
+          <button className="scrim" onClick={() => setCluster(null)} aria-label="Закрыть" />
+          <div className="sheet clist">
+            <div className="grab" />
+            <div className="st">
+              {cluster[0].venue} · {cluster.length} {plural(cluster.length, 'вечер', 'вечера', 'вечеров')}
+            </div>
+            {cluster.slice(0, 15).map((e) => (
+              <button key={e.id} className="srow" onClick={() => pickPin(e.id)}>
+                <span className="cv" style={{ backgroundImage: `url(${e.img})` }} />
+                <span className="m">
+                  <b>{e.title}</b>
+                  <i>
+                    {e.when.split(', ')[1]} · {e.frames > 0 ? frames(e.frames) : 'кадров пока нет'}
+                  </i>
+                </span>
+                <span className="ch">›</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {sheet && (
         <>
@@ -206,6 +183,7 @@ export default function MapView() {
           </div>
         </>
       )}
+
     </Shell>
   );
 }
