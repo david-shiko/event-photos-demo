@@ -31,6 +31,9 @@ export async function openSite(url) {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+  /* GitHub Pages через прокси отдаёт документ по 10–20 секунд */
+  page.setDefaultNavigationTimeout(75000);
+  page.setDefaultTimeout(20000);
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + String(e).slice(0, 200)));
   page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text().slice(0, 200)));

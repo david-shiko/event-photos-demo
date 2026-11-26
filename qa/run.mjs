@@ -6,7 +6,8 @@ import pages from './checks/pages.mjs';
 
 // QA_BASE=https://... — прогон по живому сайту вместо локальной сборки.
 const remote = process.env.QA_BASE?.replace(/\/$/, '');
-const prefix = process.env.QA_PREFIX ?? '';
+/* по живому адресу префикс берём из пути: /event-photos-demo */
+const prefix = process.env.QA_PREFIX ?? (remote ? new URL(remote).pathname.replace(/\/$/, '') : '');
 const site = remote ? { server: null, url: remote } : await serveSite(undefined, prefix);
 const { server, url } = site;
 const { browser, page, errors } = await openSite(url);
