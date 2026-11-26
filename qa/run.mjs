@@ -5,7 +5,7 @@ import map from './checks/map.mjs';
 import pages from './checks/pages.mjs';
 
 // QA_BASE=https://... — прогон по живому сайту вместо локальной сборки.
-const remote = process.env.QA_BASE;
+const remote = process.env.QA_BASE?.replace(/\/$/, '');
 const prefix = process.env.QA_PREFIX ?? '';
 const site = remote ? { server: null, url: remote } : await serveSite(undefined, prefix);
 const { server, url } = site;
