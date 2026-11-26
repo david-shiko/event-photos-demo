@@ -3,13 +3,14 @@
 import { useMemo, useState } from 'react';
 import Lightbox from './Lightbox';
 import Shell from './Shell';
-import { asset, eventFor, frames, sources, type Photo } from '@/lib/data';
+import { asset, eventFor, frames, moments, sources, type Photo } from '@/lib/data';
 import { useCopy } from '@/lib/client';
 
 type Tab = 'all' | 'photo' | 'guest';
 
 export default function EventView({ id }: { id: string }) {
   const event = useMemo(() => eventFor(id), [id]);
+  const moment = moments[id];
   const [tab, setTab] = useState<Tab>('all');
   const [period, setPeriod] = useState<string | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
@@ -40,11 +41,11 @@ export default function EventView({ id }: { id: string }) {
     <Shell
       active="Вечер"
       title="Вечер"
-      caption="Страница, куда ведёт ссылка из чата: обложка, вкладки фотограф и гости, периоды вечера с числом кадров, сетка по времени. Тап — кадр целиком, «Выбрать» — пачка и скачивание."
+      caption={`${frames(event.counts.all)} от ${event.sources} человек — в одном месте, по времени съёмки.`}
       note={
         <>
-          <b>Что проверить.</b> Хочется ли отдать такую ссылку гостям? Видно ли, что кадры
-          разные, а не один фотограф? Понятно ли, где ваши кадры?
+          <b>Гости принесли {event.counts.guests} кадров.</b> Фотограф не просил ни одного: они
+          залили сами по ссылке из чата — и вечер стал полнее, чем снимал он один.
         </>
       }
     >
@@ -62,7 +63,8 @@ export default function EventView({ id }: { id: string }) {
           </div>
           <div className="c">
             <span className="dot-ok" />
-            {frames(event.counts.all)} · {sources(event.sources)} · фото готовы
+            {frames(event.counts.all)} · {sources(event.sources)} · {event.counts.guests} принесли
+            гости
           </div>
         </div>
       </div>
@@ -103,7 +105,16 @@ export default function EventView({ id }: { id: string }) {
       <div className="feed">
         {chunks(list).map((group) => (
           <div key={group[0].id}>
-            <div className="glab">{group[0].time}</div>
+            <div
+              className={`glab ${
+                moment && group[0].time.slice(0, 2) === moment.time.slice(0, 2) ? 'mom' : ''
+              }`}
+            >
+              {group[0].time}
+              {moment && group[0].time.slice(0, 2) === moment.time.slice(0, 2) && (
+                <span className="mlab">{moment.text}</span>
+              )}
+            </div>
             {[0, 1].map((row) => {
               const slice = group.slice(row * 3, row * 3 + 3);
               if (slice.length === 0) return null;

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { mapEvents, frames } from '@/lib/data';
 
 const NAV = [
   { href: '/', label: 'Карта', icon: '1' },
@@ -10,6 +11,9 @@ const NAV = [
   { href: '/photographer/', label: 'Кабинет', icon: '4' },
   { href: '/new/', label: 'Новый вечер', icon: '5' },
 ];
+
+const total = mapEvents.reduce((s, e) => s + e.frames, 0);
+const people = mapEvents.reduce((s, e) => s + e.sources, 0);
 
 export default function Shell({
   children,
@@ -30,8 +34,20 @@ export default function Shell({
     <>
       <div className="demo">
         <aside className="side">
-          <div className="dt">Свадьба Ани — демо</div>
-          <div className="dd">{caption}</div>
+          <div className="brand">
+            <span className="dot" />
+            вечер
+          </div>
+          <h1 className="promise">
+            Все кадры вечера
+            <br />в одной ссылке.
+          </h1>
+          <div className="proof">
+            <b>{total}</b> кадров · <b>{mapEvents.length}</b> вечеров · <b>{people}</b> человек
+            снимали
+            <span>одна ночь в Москве, 11 июля</span>
+          </div>
+
           <nav className="nav">
             {NAV.map((item) => (
               <Link key={item.href} href={item.href} className={item.label === active ? 'on' : ''}>
@@ -40,6 +56,8 @@ export default function Shell({
               </Link>
             ))}
           </nav>
+
+          <div className="claim">{caption}</div>
           <div className="note">{note}</div>
         </aside>
 
@@ -60,7 +78,9 @@ export default function Shell({
                 {item.label}
               </Link>
             ))}
-            <div className="sub">Демо на мок-данных. Фотографии — заглушки.</div>
+            <div className="sub">
+              {frames(total)} с {mapEvents.length} вечеров. Демо на мок-данных, фото — заглушки.
+            </div>
           </div>
         </div>
       )}

@@ -108,9 +108,10 @@ export type MapEvent = {
   frames: number;
   sources: number;
   img: string;
-  x: number;
-  y: number;
+  lat: number;
+  lng: number;
   locked?: boolean;
+  soon?: boolean;
   featured?: boolean;
 };
 
@@ -123,8 +124,8 @@ export const mapEvents: MapEvent[] = [
     frames: 168,
     sources: 24,
     img: asset('/img/vp2.png'),
-    x: 50,
-    y: 40,
+    lat: 55.7394,
+    lng: 37.6078,
     featured: true,
   },
   {
@@ -135,8 +136,8 @@ export const mapEvents: MapEvent[] = [
     frames: 84,
     sources: 11,
     img: asset('/img/vl3.png'),
-    x: 26,
-    y: 24,
+    lat: 55.7529,
+    lng: 37.6377,
   },
   {
     id: 'vinzavod',
@@ -146,8 +147,8 @@ export const mapEvents: MapEvent[] = [
     frames: 240,
     sources: 38,
     img: asset('/img/p5.png'),
-    x: 70,
-    y: 28,
+    lat: 55.7553,
+    lng: 37.6642,
   },
   {
     id: 'mark-bday',
@@ -157,8 +158,8 @@ export const mapEvents: MapEvent[] = [
     frames: 56,
     sources: 9,
     img: asset('/img/vp6.png'),
-    x: 33,
-    y: 56,
+    lat: 55.7536,
+    lng: 37.6402,
   },
   {
     id: 'kassety',
@@ -168,8 +169,8 @@ export const mapEvents: MapEvent[] = [
     frames: 132,
     sources: 17,
     img: asset('/img/vl5.png'),
-    x: 62,
-    y: 58,
+    lat: 55.7602,
+    lng: 37.6241,
   },
   {
     id: 'tochki',
@@ -179,11 +180,48 @@ export const mapEvents: MapEvent[] = [
     frames: 0,
     sources: 0,
     img: asset('/img/p7.png'),
-    x: 18,
-    y: 42,
+    lat: 55.7106,
+    lng: 37.5798,
     locked: true,
   },
+  {
+    id: 'streletc',
+    title: 'Открытие бара',
+    venue: 'Бар «Стрелка»',
+    when: '11 июля, 20:00–02:00',
+    frames: 0,
+    sources: 0,
+    img: asset('/img/vl1.png'),
+    lat: 55.7491,
+    lng: 37.6272,
+    soon: true,
+  },
+  {
+    id: 'liza-bday',
+    title: 'День рождения Лизы',
+    venue: 'Лофт на Курской',
+    when: '11 июля, 21:00–03:00',
+    frames: 0,
+    sources: 0,
+    img: asset('/img/vp8.png'),
+    lat: 55.7462,
+    lng: 37.6472,
+    soon: true,
+  },
+  {
+    id: 'patriki',
+    title: 'Ужин на Патриках',
+    venue: 'Ресторан на Патриарших',
+    when: '11 июля, 19:30–23:30',
+    frames: 0,
+    sources: 0,
+    img: asset('/img/p1.png'),
+    lat: 55.7638,
+    lng: 37.5922,
+    soon: true,
+  },
 ];
+
 
 export type Ev = {
   id: string;
@@ -267,4 +305,13 @@ export const cabinet = {
       img: asset('/img/p4.png'),
     },
   ],
+};
+
+/** Моменты вечера: подпись к самому запомнившемуся часу. */
+export const moments: Record<string, { time: string; text: string }> = {
+  '7kd2qf9xm': { time: '01:00', text: 'тот самый тост' },
+  'jazz-sol': { time: '22:00', text: 'соло на саксофоне' },
+  'vinzavod': { time: '20:00', text: 'первый зал' },
+  'kassety': { time: '23:00', text: 'вышли на бис' },
+  'mark-bday': { time: '23:00', text: 'торт на крыше' },
 };

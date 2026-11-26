@@ -153,3 +153,16 @@
 .sheet .rep b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 .sheet .rep span { font-size: 10.5px; color: var(--mut); }
 .sheet .reph { font-size: 11px; color: var(--mut); line-height: 1.5; margin-top: 12px; }
+
+.glab.mom { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.glab.mom .mlab {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--acc);
+  padding: 1px 7px;
+  border: 1px solid rgba(226, 69, 47, 0.35);
+  border-radius: 20px;
+  background: rgba(226, 69, 47, 0.06);
+}
