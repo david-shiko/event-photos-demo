@@ -73,7 +73,7 @@ export default [
       await h.click(h.page, '.bar2 .rb');
       await h.sleep(900);
       const href = await h.page.evaluate(() => location.pathname);
-      h.eq(href, '/', 'адрес после «назад»');
+      h.eq(href, `${h.prefix}/`, 'адрес после «назад»');
     },
   },
   {
@@ -103,7 +103,7 @@ export default [
       await h.go('/photographer/');
       await h.waitFor(() => document.querySelectorAll('.cab .ev').length > 0, 15000, 'карточки вечеров');
       const id = await h.page.$eval('.cab .ev', (el) => el.getAttribute('href'));
-      h.ok(!!id && id.startsWith('/e/'), `карточка вечера не ссылка: ${id}`);
+      h.ok(!!id && id.startsWith(`${h.prefix}/e/`), `карточка вечера не ссылка: ${id}`);
       await h.click(h.page, '.cab .ev');
       await h.sleep(900);
       const path = await h.page.evaluate(() => location.pathname);

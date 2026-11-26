@@ -13,6 +13,7 @@ const { browser, page, errors } = await openSite(url);
 
 const ctx = {
   page,
+  prefix,
   base: url,
   click,
   boxOf,
