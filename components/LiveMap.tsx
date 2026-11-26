@@ -20,7 +20,6 @@ const STYLE = 'https://tiles.openfreemap.org/styles/positron';
 const CENTER: [number, number] = [37.628, 55.7505];
 /* пять и больше вечеров в одном адресе — стопка (design.md §3.5) */
 const STACK_MIN = 5;
-const HERO_DROP = 0.5; // ниже стартового охвата — герой-пин
 const CARD_W = 252;
 
 type Group = { items: MapEvent[]; lat: number; lng: number };
@@ -39,7 +38,6 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
   const groups = useRef<Group[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [card, setCard] = useState<Card | null>(null);
-  const [far, setFar] = useState(false);
   const pick = useRef(onPick);
   const cluster = useRef(onCluster);
   const ready = useRef(false);
@@ -105,12 +103,10 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           }
         }
 
-        setFar(m.getZoom() < startZoom.current - HERO_DROP);
         m.resize();
         window.dispatchEvent(new Event('lmap-ready'));
       });
 
-      m.on('zoom', () => setFar(m.getZoom() < startZoom.current - HERO_DROP));
     })();
 
     return () => {
@@ -189,8 +185,10 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           el.type = 'button';
           el.className = stack ? 'lstack' : `lpin ${lead.soon ? 'soon' : ''} ${lead.locked ? 'lock' : ''}`;
           if (stack) {
+            const venues = new Set(g.items.map((i) => i.venue));
+            const label = venues.size > 1 ? 'Москва' : lead.venue;
             el.dataset.venue = lead.venue;
-            el.innerHTML = `<b>${g.items.length}</b><span class="nm">${lead.venue}</span>`;
+            el.innerHTML = `<b>${g.items.length}</b><span class="nm">${label}</span>`;
             el.addEventListener('click', () => cluster.current(g.items));
           } else {
             const time = lead.when.split(', ')[1]?.split('–')[0] ?? '';
@@ -207,7 +205,6 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
         const el = marker.getElement();
         el.classList.toggle('on', g.items.some((i) => i.id === activeId));
         el.classList.toggle('dim', g.items.every((i) => dim.includes(i.id)));
-        el.classList.toggle('hide', far);
       });
     };
 
@@ -234,7 +231,7 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
       window.removeEventListener('lmap-ready', onReady);
       if (hooked) map.current?.off('zoomend', onZoom);
     };
-  }, [events, activeId, dim, far]);
+  }, [events, activeId, dim]);
 
 
   /* карточка висит над выбранным пином и едет вместе с картой */
@@ -300,17 +297,6 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
     <>
       <div ref={box} className="lmap" aria-label="Карта вечеров" />
       {!loaded && <span className="lmap-load">карта загружается…</span>}
-
-      {far && (
-        <button
-          className="lhero"
-          onClick={() => map.current?.easeTo({ zoom: 13.4, duration: 500 })}
-          aria-label="Приблизить"
-        >
-          <b>{events.length}</b>
-          <span className="nm">и ещё {Math.max(0, events.length - 1)}</span>
-        </button>
-      )}
 
       {active && card && (
         <div

@@ -166,39 +166,7 @@
   border-radius: 7px;
 }
 
-.lhero {
-  position: absolute;
-  left: 50%;
-  top: 42%;
-  transform: translate(-50%, -50%);
-  z-index: 4;
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
-  border: 4px solid var(--panel);
-  background: var(--ink);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 8px 22px rgba(20, 18, 14, 0.4);
-  font-size: 19px;
-  font-weight: 650;
-}
-.lstack:hover .nm,
-.lstack.on .nm { opacity: 1; }
 
-.lhero .nm {
-  position: absolute;
-  left: 50%;
-  top: 64px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  background: var(--ink);
-  color: #fff;
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 7px;
-}
 
 /* ---------- карточка над пином ---------- */
 .pincard {

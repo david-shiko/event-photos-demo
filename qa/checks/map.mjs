@@ -332,21 +332,32 @@ export default [
     },
   },
   {
-    name: 'дальний зум: герой-пин',
+    name: 'дальний зум: кластер привязан к городу',
     run: async (h) => {
       await h.go('/');
-      await h.waitFor(() => document.querySelectorAll('.lpin').length > 0, 45000, 'пины на карте');
-      const box = await h.boxOf(h.page, '.lmap');
-      await h.page.mouse.move(box.x + box.w / 2, box.y + box.h / 2);
-      for (let i = 0; i < 6; i++) {
-        await h.page.mouse.wheel(0, 400);
-        await h.sleep(220);
+      await h.waitFor(() => document.querySelectorAll('.lpin, .lstack').length > 0, 45000, 'пины');
+      /* настоящий клик по кнопке «минус»: колесо зависит от мыши и системы */
+      for (let i = 0; i < 5; i++) {
+        await h.click(h.page, '.maplibregl-ctrl-zoom-out');
+        await h.sleep(400);
       }
-      await h.waitFor(() => !!document.querySelector('.lhero'), 6000, 'герой-пин на дальнем зуме');
-      const shown = await h.page.$$eval('.lpin:not(.hide)', (els) => els.length);
-      h.eq(shown, 0, 'обычные пины на дальнем зуме');
-      await h.click(h.page, '.lhero');
-      await h.waitFor(() => !document.querySelector('.lhero'), 8000, 'возврат к обычным пинам');
+      await h.sleep(900);
+      h.eq(await h.page.$$eval('.lhero', (els) => els.length), 0, 'шар поверх карты вместо кластера');
+      const stacks = () =>
+        h.page.evaluate(() =>
+          [...document.querySelectorAll('.lstack:not(.hide)')].map((el) => {
+            const r = el.getBoundingClientRect();
+            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+          }),
+        );
+      const before = await stacks();
+      h.ok(before.length >= 1, 'на дальнем зуме нет ни одного кластера');
+      const spot = await freeSpot(h.page);
+      h.ok(!!spot, 'негде взяться за карту');
+      await pan(h.page, spot, -96, 0, 8);
+      const after = await stacks();
+      h.ok(after.length >= 1, 'кластер исчез после пана');
+      h.near(after[0].x - before[0].x, -96, 3, 'сдвиг кластера против хода карты');
     },
   },
   {
