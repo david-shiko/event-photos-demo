@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import Shell from './Shell';
 import LiveMap from './LiveMap';
-import { asset, frames, mapEvents, sources } from '@/lib/data';
+import { asset, evenings, frames, mapEvents, sources, windowMinutes } from '@/lib/data';
+import WhenSheet from './WhenSheet';
 import { useCopy } from '@/lib/client';
 
 type Filter = 'all' | 'near' | 'live' | 'video';
@@ -24,10 +25,18 @@ export default function MapView() {
   const [picked, setPicked] = useState('7kd2qf9xm');
   const [sheet, setSheet] = useState(false);
   const [open, setOpen] = useState(false);
+  const [when, setWhen] = useState(false);
+  const [date, setDate] = useState('11 июля');
+  const [hour, setHour] = useState<number | null>(null);
   const [asked, setAsked] = useState(false);
   const { done: copied, copy } = useCopy();
 
   const visible = mapEvents.filter((e) => {
+    if (e.when.split(', ')[0] !== date) return false;
+    if (hour !== null) {
+      const { from, to } = windowMinutes(e.when);
+      if (hour < from || hour >= to) return false;
+    }
     if (filter === 'near') {
       const d = Math.hypot(e.lat - CENTER.lat, e.lng - CENTER.lng);
       return d < 0.045;
@@ -39,6 +48,9 @@ export default function MapView() {
 
   const current = mapEvents.find((e) => e.id === picked) ?? mapEvents[0];
   const total = mapEvents.reduce((s, e) => s + e.frames, 0);
+  const clock = (m: number) =>
+    `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const liveFrames = visible.reduce((s, e) => s + e.frames, 0);
 
   return (
     <Shell
@@ -64,12 +76,26 @@ export default function MapView() {
 
         <div className="maphead">
           <div className="mpills">
-            <span className="city">◷ Москва · 11 июля</span>
+            <button className="city" onClick={() => setWhen(true)}>
+              ◷ Москва · {date}
+              {hour !== null && `, ${clock(hour)}`}
+              <i>⌄</i>
+            </button>
             <span className="me">◎</span>
           </div>
           <div className="mlive">
             <span className="dot-ok" />
-            сейчас снимают <b>12</b> человек · {mapEvents.length} вечеров
+            {visible.length === 0 ? (
+              <>вечеров на {date} пока нет</>
+            ) : hour === null ? (
+              <>
+                сейчас снимают <b>12</b> человек · {evenings(mapEvents.length)}
+              </>
+            ) : (
+              <>
+                в {clock(hour)} идёт {evenings(visible.length)} · <b>{liveFrames}</b> кадров
+              </>
+            )}
           </div>
           <div className="mchips">
             {FILTERS.map((f) => (
@@ -84,6 +110,7 @@ export default function MapView() {
           </div>
         </div>
 
+        {visible.length > 0 && (
         <div className={`msheet ${open ? 'open' : ''}`}>
           <button className="grab" onClick={() => setOpen(!open)} aria-label="Развернуть карточку" />
           <div className="row" onClick={() => setOpen(!open)}>
@@ -156,7 +183,37 @@ export default function MapView() {
           )}
           <div className="mcredit">карта © OpenStreetMap, © OpenFreeMap</div>
         </div>
+        )}
       </div>
+
+      {visible.length === 0 && (
+        <div className="mempty">
+          <b>На {date} вечеров пока нет</b>
+          <span>Карта наполняется в день вечера. Пока можно посмотреть 11 июля.</span>
+          <button
+            onClick={() => {
+              setDate('11 июля');
+              setHour(null);
+            }}
+          >
+            Вернуться на 11 июля
+          </button>
+        </div>
+      )}
+
+      {when && (
+        <WhenSheet
+          events={mapEvents}
+          date={date}
+          hour={hour}
+          onClose={() => setWhen(false)}
+          onApply={(d, h) => {
+            setDate(d);
+            setHour(h);
+            setWhen(false);
+          }}
+        />
+      )}
 
       {sheet && (
         <>

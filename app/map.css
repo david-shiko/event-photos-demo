@@ -29,7 +29,9 @@
 .lpwrap { background: none; border: 0; }
 
 .lpin {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   background: none;
   border: 0;
   padding: 0;
@@ -157,4 +159,122 @@
   text-align: center;
   font-size: 10.5px;
   color: #8d8a83;
+}
+
+/* ---------- окно «когда» ---------- */
+.mpills .city {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mpills .city i { font-style: normal; font-size: 9px; opacity: 0.55; }
+
+.whn .wlb {
+  margin-top: 14px;
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8d8a83;
+  font-weight: 650;
+}
+.whn .wdates { display: flex; gap: 8px; margin-top: 7px; }
+.whn .wdates button {
+  flex: 1;
+  height: 52px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+}
+.whn .wdates button span { white-space: nowrap; }
+.whn .wdates button i {
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--mut);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.whn .wdates button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.whn .wdates button.on i { color: rgba(255, 255, 255, 0.6); }
+
+.whn .wlbrow { display: flex; align-items: center; justify-content: space-between; }
+.whn .wall {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 20px;
+  padding: 2px 9px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #4a473f;
+  cursor: pointer;
+}
+.whn .wall.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.whn .whours {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 7px;
+}
+.whn .whours::-webkit-scrollbar { display: none; }
+.whn .whours button {
+  flex: none;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #3f3d38;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.whn .whours button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.whn .wres { margin-top: 14px; font-size: 11.5px; color: var(--mut); }
+.whn .wres b { color: var(--ink); font-weight: 650; }
+
+.mempty {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  width: 264px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 14px 34px rgba(20, 18, 14, 0.2);
+  text-align: center;
+}
+.mempty b { display: block; font-size: 13px; font-weight: 650; }
+.mempty span { display: block; margin-top: 6px; font-size: 11px; color: var(--mut); line-height: 1.45; }
+.mempty button {
+  width: 100%;
+  height: 34px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }

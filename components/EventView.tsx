@@ -3,8 +3,18 @@
 import { useMemo, useState } from 'react';
 import Lightbox from './Lightbox';
 import Shell from './Shell';
-import { asset, eventFor, frames, moments, sources, type Photo } from '@/lib/data';
+import {
+  asset,
+  clockMinutes,
+  eventFor,
+  frames,
+  moments,
+  sources,
+  windowMinutes,
+  type Photo,
+} from '@/lib/data';
 import { useCopy } from '@/lib/client';
+import Timeline from './Timeline';
 
 type Tab = 'all' | 'photo' | 'guest';
 
@@ -12,21 +22,35 @@ export default function EventView({ id }: { id: string }) {
   const event = useMemo(() => eventFor(id), [id]);
   const moment = moments[id];
   const [tab, setTab] = useState<Tab>('all');
-  const [period, setPeriod] = useState<string | null>(null);
+  const [at, setAt] = useState<number | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
   const [selecting, setSelecting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const [sheet, setSheet] = useState(false);
   const { done: copied, copy } = useCopy();
 
+  const { from, to } = windowMinutes(event.window);
+  const wasThere = clockMinutes(event.wasThere);
+
+  const buckets = useMemo(() => {
+    const step = 15;
+    const out: { from: number; count: number }[] = [];
+    for (let t = from; t < to; t += step) out.push({ from: t, count: 0 });
+    event.photos.forEach((p) => {
+      const i = Math.floor((clockMinutes(p.time) - from) / step);
+      if (out[i]) out[i].count += 1;
+    });
+    return out;
+  }, [event, from, to]);
+
   const list = useMemo(
     () =>
       event.photos.filter(
         (p) =>
           (tab === 'all' || (tab === 'photo' && p.source === 'photo') || (tab === 'guest' && p.source === 'guest')) &&
-          (!period || p.period === period),
+          (at === null || Math.abs(clockMinutes(p.time) - at) <= 40),
       ),
-    [tab, period, event],
+    [tab, at, event],
   );
 
   const toggle = (id: number) =>
@@ -81,25 +105,22 @@ export default function EventView({ id }: { id: string }) {
         </button>
       </div>
 
-      <div className="strip">
-        <div className="chips">
-          {event.periods.map((p) => (
-            <button
-              key={p.id}
-              className={`chip2 ${period === p.id ? 'on' : ''}`}
-              onClick={() => setPeriod(period === p.id ? null : p.id)}
-            >
-              {p.label}
-              <b>{p.count}</b>
-            </button>
-          ))}
-        </div>
-        <div className="hint2">
-          <span>весь вечер {event.window}</span>
-          <button className="fake" onClick={() => setPeriod(period ? null : 'b')}>
-            вы были в {event.wasThere} · сбросить
-          </button>
-        </div>
+      <Timeline
+        from={from}
+        to={to}
+        buckets={buckets}
+        at={at}
+        onChange={setAt}
+        wasThere={wasThere}
+        moment={moment}
+        guests={event.counts.guests}
+      />
+
+      <div className="feedhead">
+        <span>
+          {at === null ? event.window : `${clock(at - 40)}–${clock(at + 40)} · ±40 мин`}
+        </span>
+        <b>{frames(list.length)}</b>
       </div>
 
       <div className="feed">
@@ -201,6 +222,9 @@ function Thumb({
     </button>
   );
 }
+
+const clock = (m: number) =>
+  `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 
 function chunks<T>(items: T[], size = 6): T[][] {
   const out: T[][] = [];

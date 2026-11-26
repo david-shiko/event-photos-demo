@@ -10,6 +10,7 @@ export const plural = (n: number, one: string, few: string, many: string) => {
 };
 
 export const frames = (n: number) => `${n} ${plural(n, 'кадр', 'кадра', 'кадров')}`;
+export const evenings = (n: number) => `${n} ${plural(n, 'вечер', 'вечера', 'вечеров')}`;
 export const sources = (n: number) => `${n} ${plural(n, 'источник', 'источника', 'источников')}`;
 
 export type Period = { id: string; label: string; count: number; from: number; to: number };
@@ -46,6 +47,16 @@ const parseWindow = (when: string) => {
   return { from, to };
 };
 
+/** «19:00–02:00» → минуты от полуночи; конец переезжает через полночь. */
+export const windowMinutes = (when: string) => parseWindow(when);
+
+/** «21:40» → минуты, после полуночи продолжает счёт. */
+export const clockMinutes = (t: string) => {
+  const h = Number(t.slice(0, 2));
+  const m = Number(t.slice(3, 5));
+  return (h < 12 ? h + 24 : h) * 60 + m;
+};
+
 /** Вечер режется на двухчасовые куски, последний — до конца. */
 const bucketsOf = (from: number, to: number) => {
   const out: { from: number; to: number }[] = [];
@@ -67,9 +78,39 @@ const splitByTime = (n: number, from: number, to: number) => {
   });
 };
 
+/** Как гуляет вечер: тише в начале, пик к полуночи, всплеск на тосте в час. */
+const weight = (minute: number) => {
+  const h = Math.floor(minute / 60);
+  if (h < 20) return 0.55;
+  if (h < 21) return 1.05;
+  if (h < 23) return 1.4;
+  if (h < 24) return 1.05;
+  if (h < 25) return 1.2;
+  return 1.95;
+};
+
+/** Раскладывает n кадров по 15-минутным слотам так, чтобы сумма сошлась. */
+const spread = (n: number, from: number, to: number) => {
+  const step = 15;
+  const slots: { from: number; to: number; count: number }[] = [];
+  for (let t = from; t < to; t += step) slots.push({ from: t, to: Math.min(t + step, to), count: 0 });
+  const weights = slots.map((s) => weight(s.from) * (s.to - s.from));
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  const exact = weights.map((w) => (n * w) / total);
+  const base = exact.map((x) => Math.floor(x));
+  let left = n - base.reduce((a, b) => a + b, 0);
+  const order = exact.map((x, i) => ({ i, r: x - base[i] })).sort((a, b) => b.r - a.r);
+  order.forEach((o) => {
+    if (left <= 0) return;
+    base[o.i] += 1;
+    left -= 1;
+  });
+  return slots.map((s, i) => ({ from: s.from, to: s.to, count: Math.max(0, base[i]) }));
+};
+
 export const makePhotos = (n: number, from: number, to: number): Photo[] => {
   const out: Photo[] = [];
-  splitByTime(n, from, to).forEach((b, bi) => {
+  spread(n, from, to).forEach((b, bi) => {
     for (let k = 0; k < b.count; k += 1) {
       const i = out.length;
       const minute = b.from + ((k + 0.5) * (b.to - b.from)) / b.count;
