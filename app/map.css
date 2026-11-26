@@ -308,8 +308,13 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .railscroll::-webkit-scrollbar { display: none; }
+.railscroll.drag { cursor: grabbing; }
+.railscroll:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
 .railtrack { position: relative; height: 78px; }
 
 .railhour { position: absolute; top: 22px; }
@@ -358,6 +363,19 @@
   padding: 0;
   cursor: pointer;
 }
+/* точка 7 px, но попадать по ней надо пальцем */
+.raildot::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+/* несколько вечеров в одну минуту — одна точка, чуть крупнее */
+.raildot.multi { width: 9px; height: 9px; margin-left: -4.5px; }
 .raildot.on { background: var(--ink); border-color: var(--ink); }
 
 .railnow {

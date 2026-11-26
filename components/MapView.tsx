@@ -172,6 +172,10 @@ export default function MapView() {
             now={NOW}
             events={mapEvents}
             onChange={setChosen}
+            onEvent={(id) => {
+              setPicked(id);
+              setOpen(false);
+            }}
           />
         </div>
       </div>

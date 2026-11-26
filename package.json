@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "qa": "node qa/run.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.19.0",
@@ -18,6 +19,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "puppeteer-core": "^25.19.0",
     "typescript": "latest"
   }
 }
