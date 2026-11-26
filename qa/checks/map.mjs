@@ -138,10 +138,12 @@ export default [
     run: async (h) => {
       await h.go('/');
       await h.waitFor(() => !!document.querySelector('.lstack'), 45000, 'стопка пинов');
+      const want = await h.page.$eval('.lstack b', (el) => Number(el.textContent));
+      h.ok(want >= 5, `в стопке ${want} вечеров, ждали ≥5`);
       await h.click(h.page, '.lstack');
       await h.waitFor(() => !!document.querySelector('.sheet.clist'), 6000, 'лист стопки');
       const rows = await h.page.$$eval('.sheet.clist .srow', (els) => els.length);
-      h.eq(rows, 5, 'строк в листе стопки');
+      h.eq(rows, want, 'строк в листе стопки');
       const title = await h.page.$eval('.sheet.clist .srow b', (el) => el.textContent);
       await h.click(h.page, '.sheet.clist .srow');
       await h.sleep(900);

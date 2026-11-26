@@ -79,6 +79,8 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
         ready.current = true;
         setLoaded(true);
 
+        m.setPadding({ top: 124, bottom: 208, left: 14, right: 14 });
+
         m.getStyle()?.layers?.forEach((l) => {
           if (l.type !== 'symbol') return;
           const field = (l.layout as Record<string, unknown> | undefined)?.['text-field'];
@@ -95,11 +97,9 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
           pts.slice(1).forEach((pt) => b.extend(pt));
           /* охват считаем по размеру полотна: fitBounds до первого resize врёт */
-          const cam = m.cameraForBounds(b, {
-            padding: { top: 168, bottom: 132, left: 36, right: 36 },
-          });
+          const cam = m.cameraForBounds(b, { padding: 0 });
           if (cam?.center) {
-            startZoom.current = Math.min(cam.zoom ?? 13, 13.4);
+            startZoom.current = Math.min((cam.zoom ?? 13) + 0.85, 13.4);
             m.jumpTo({ center: cam.center, zoom: startZoom.current });
           }
         }
@@ -139,7 +139,44 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
         if (bucket) bucket.push(e);
         else byVenue.set(key, [e]);
       }
-      const next: Group[] = [...byVenue.values()].map(spread);
+      const merged = [...byVenue.values()].map(spread);
+
+      /* «пять и больше в пятне»: близкие на экране группы — одна стопка */
+      const near = new Set<Group>();
+      const clusters: Group[] = [];
+      for (const g of merged) {
+        if (near.has(g)) continue;
+        const p = m.project([g.lng, g.lat]);
+        const items = [...g.items];
+        near.add(g);
+        for (const other of merged) {
+          if (near.has(other)) continue;
+          const q = m.project([other.lng, other.lat]);
+          if (Math.hypot(q.x - p.x, q.y - p.y) < 44) {
+            items.push(...other.items);
+            near.add(other);
+          }
+        }
+        clusters.push(spread(items));
+      }
+      /* стопки не должны стоять вплотную: склеиваем и их, пока не разъедутся */
+      let guard = 0;
+      let again = true;
+      while (again && guard++ < 6) {
+        again = false;
+        for (let i = 0; i < clusters.length && !again; i++) {
+          const p = m.project([clusters[i].lng, clusters[i].lat]);
+          for (let j = i + 1; j < clusters.length; j++) {
+            const q = m.project([clusters[j].lng, clusters[j].lat]);
+            if (Math.hypot(q.x - p.x, q.y - p.y) >= 62) continue;
+            clusters[i] = spread([...clusters[i].items, ...clusters[j].items]);
+            clusters.splice(j, 1);
+            again = true;
+            break;
+          }
+        }
+      }
+      const next: Group[] = clusters;
       groups.current = next;
 
       const keys = new Set(next.map((g) => g.items.map((i) => i.id).sort().join('+')));
@@ -160,6 +197,7 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           el.type = 'button';
           el.className = stack ? 'lstack' : `lpin ${lead.soon ? 'soon' : ''} ${lead.locked ? 'lock' : ''}`;
           if (stack) {
+            el.dataset.venue = lead.venue;
             el.innerHTML = `<b>${g.items.length}</b><span class="nm">${lead.venue}</span>`;
             el.addEventListener('click', () => cluster.current(g.items));
           } else {
