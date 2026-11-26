@@ -8,12 +8,12 @@ import { asset } from '@/lib/data';
 type Item = { id: number; name: string; size: string; img: string; video?: boolean };
 
 const FILES: Item[] = [
-  { id: 1, name: 'IMG_4821.HEIC', size: '4,2 МБ', img: asset('/img/p3.png') },
-  { id: 2, name: 'IMG_4822.HEIC', size: '3,8 МБ', img: asset('/img/p5.png') },
-  { id: 3, name: 'IMG_4825.JPG', size: '5,1 МБ', img: asset('/img/vl1.png') },
-  { id: 4, name: 'VID_5512.MOV', size: '62 МБ', img: asset('/img/vp2.png'), video: true },
-  { id: 5, name: 'IMG_4829.HEIC', size: '4,4 МБ', img: asset('/img/p7.png') },
-  { id: 6, name: 'IMG_4831.HEIC', size: '6,2 МБ', img: asset('/img/vl5.png') },
+  { id: 1, name: 'IMG_4821.HEIC', size: '4,2 МБ', img: asset('/img/p3.jpg') },
+  { id: 2, name: 'IMG_4822.HEIC', size: '3,8 МБ', img: asset('/img/p5.jpg') },
+  { id: 3, name: 'IMG_4825.JPG', size: '5,1 МБ', img: asset('/img/vl1.jpg') },
+  { id: 4, name: 'VID_5512.MOV', size: '62 МБ', img: asset('/img/vp2.jpg'), video: true },
+  { id: 5, name: 'IMG_4829.HEIC', size: '4,4 МБ', img: asset('/img/p7.jpg') },
+  { id: 6, name: 'IMG_4831.HEIC', size: '6,2 МБ', img: asset('/img/vl5.jpg') },
 ];
 
 export default function Uploader() {

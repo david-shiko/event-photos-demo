@@ -89,7 +89,7 @@ export default [
         download: el.getAttribute('download'),
       }));
       h.eq(save.tag, 'A', 'кнопка скачивания — ссылка на файл');
-      h.ok(!!save.href && /\.png$/.test(save.href), `href у скачивания: ${save.href}`);
+      h.ok(!!save.href && /\.(png|jpe?g)$/i.test(save.href), `href у скачивания: ${save.href}`);
       h.ok(!!save.download, 'у ссылки нет атрибута download');
       await h.click(h.page, '.lb .acts button', 0);
       await h.sleep(300);

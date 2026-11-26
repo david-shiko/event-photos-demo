@@ -76,7 +76,7 @@ export default function Page() {
         {created.map((e) => (
           <Link className="ev" key={e.id} href="/e/7kd2qf9xm/">
             <div className="r">
-              <div className="im" style={{ backgroundImage: `url(${asset('/img/p4.png')})` }} />
+              <div className="im" style={{ backgroundImage: `url(${asset('/img/p4.jpg')})` }} />
               <div>
                 <div className="t">{e.title}</div>
                 <div className="l">
