@@ -46,7 +46,6 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
   const observer = useRef<ResizeObserver | null>(null);
   const raf = useRef(0);
   const startZoom = useRef(13);
-  const clipRef = useRef<(() => void) | null>(null);
   pick.current = onPick;
   cluster.current = onCluster;
 
@@ -218,54 +217,33 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
         el.classList.toggle('dim', g.items.every((i) => dim.includes(i.id)));
         el.classList.toggle('hide', far);
       });
-
-      clipRef.current?.();
     };
 
     sync();
-    const onReady = () => sync();
+    /* плотность стопок зависит от зума: без пересчёта стопка не раскрывается.
+       Карта создаётся в другом эффекте, поэтому вешаем обработчик и сразу,
+       и по её готовности — сработает первый. */
+    const onZoom = () => sync();
+    let hooked = false;
+    const attach = () => {
+      const mm = map.current;
+      if (!mm || hooked) return;
+      mm.on('zoomend', onZoom);
+      hooked = true;
+    };
+    const onReady = () => {
+      attach();
+      sync();
+    };
+    attach();
     window.addEventListener('lmap-ready', onReady);
     return () => {
       dead = true;
       window.removeEventListener('lmap-ready', onReady);
+      if (hooked) map.current?.off('zoomend', onZoom);
     };
   }, [events, activeId, dim, far]);
 
-  /* пин за краем рабочей области не показываем: иначе он уезжает под шапку
-     или под панель и перестаёт нажиматься */
-  useEffect(() => {
-    const m = map.current;
-    if (!m) return;
-    const clip = () => {
-      const h = m.getCanvas().clientHeight;
-      const pad = m.getPadding();
-      const top = pad.top ?? 0;
-      const bottom = pad.bottom ?? 0;
-      pins.current.forEach((marker) => {
-        const ll = marker.getLngLat();
-        const p = m.project([ll.lng, ll.lat]);
-        /* пин 42 px с подписью: половину высоты держим в рабочей области */
-        const half = 30;
-        const out =
-          p.x < 10 ||
-          p.x > m.getCanvas().clientWidth - 10 ||
-          p.y - half < top ||
-          p.y + half > h - bottom;
-        marker.getElement().classList.toggle('offscreen', out);
-      });
-    };
-    clipRef.current = clip;
-    clip();
-    m.on('move', clip);
-    m.on('zoom', clip);
-    m.on('resize', clip);
-    return () => {
-      clipRef.current = null;
-      m.off('move', clip);
-      m.off('zoom', clip);
-      m.off('resize', clip);
-    };
-  }, [events, far, loaded]);
 
   /* карточка висит над выбранным пином и едет вместе с картой */
   useEffect(() => {

@@ -1,5 +1,41 @@
 // Проверки карты: лента суток, дни, точки, пины. Всё — настоящими событиями ввода.
+import { sleep } from '../browser.mjs';
+
 const PX_PER_MIN = 52 / 60;
+
+/* Свободное место на самой карте: шапка, пины и панель перехватывают нажатие. */
+const freeSpot = (page) =>
+  page.evaluate(() => {
+    const c = document.querySelector('.maplibregl-canvas');
+    if (!c) return null;
+    const r = c.getBoundingClientRect();
+    for (let fy = 0.14; fy <= 0.62; fy += 0.06) {
+      for (let fx = 0.18; fx <= 0.9; fx += 0.08) {
+        const x = Math.round(r.x + r.width * fx);
+        const y = Math.round(r.y + r.height * fy);
+        const el = document.elementFromPoint(x, y);
+        if (el && el.classList.contains('maplibregl-canvas')) return { x, y };
+      }
+    }
+    return null;
+  });
+
+/* Тянем карту от свободной точки. Кнопку отпускаем всегда, иначе следующая
+   проверка падает с «left is already pressed» вместо своей ошибки. */
+const pan = async (page, spot, dx, dy, steps, onStep) => {
+  await page.mouse.move(spot.x, spot.y);
+  await page.mouse.down();
+  try {
+    for (let i = 1; i <= steps; i++) {
+      await page.mouse.move(spot.x + (dx * i) / steps, spot.y + (dy * i) / steps);
+      await sleep(70);
+      if (onStep) await onStep(i);
+    }
+  } finally {
+    await page.mouse.up();
+    await sleep(400);
+  }
+};
 
 export const state = (page) =>
   page.evaluate(() => {
@@ -149,20 +185,114 @@ export default [
     },
   },
   {
-    name: 'карта: пины не уезжают под шапку и панель',
+    name: 'карта: пины едут вместе с картой',
     run: async (h) => {
       await h.go('/');
-      await h.waitFor(() => document.querySelectorAll('.lpin').length > 0, 45000, 'пины');
-      await h.sleep(600);
-      const bad = await h.page.evaluate(() => {
-        const head = document.querySelector('.mhead').getBoundingClientRect();
-        const foot = document.querySelector('.mbottom').getBoundingClientRect();
-        return [...document.querySelectorAll('.lpin:not(.hide):not(.offscreen), .lstack:not(.hide):not(.offscreen)')]
-          .map((el) => el.getBoundingClientRect())
-          .filter((r) => r.bottom > head.top && r.top < head.bottom || r.top < foot.bottom && r.bottom > foot.top)
-          .length;
+      await h.waitFor(() => document.querySelectorAll('.lpin:not(.lstack)').length > 0, 45000, 'пины');
+      const spots = () =>
+        h.page.evaluate(() =>
+          [...document.querySelectorAll('.lpin:not(.lstack):not(.hide)')]
+            .map((el) => {
+              const r = el.getBoundingClientRect();
+              return { name: el.querySelector('.nm')?.textContent ?? '', x: Math.round(r.x + r.width / 2), w: r.width };
+            })
+            /* пин нулевого размера — это уже поломка, её ловит проверка про шапку */
+            .filter((p) => p.w > 0)
+            .map((p) => [p.name, p.x]),
+        );
+      const spot = await freeSpot(h.page);
+      h.ok(!!spot, 'на карте нет свободного места: всё занято шапкой и панелью');
+      const before = Object.fromEntries(await spots());
+      const names = Object.keys(before).slice(0, 3);
+      h.ok(names.length >= 2, `на карте ${names.length} пинов — не на чем мерить`);
+      let prev = before;
+      await pan(h.page, spot, -96, 0, 8, async (i) => {
+        const now = Object.fromEntries(await spots());
+        for (const n of names) {
+          h.ok(n in now, `пин «${n}» исчез на шаге ${i}`);
+          h.near(now[n] - prev[n], -12, 2, `сдвиг пина «${n}» на шаге ${i} против хода мыши`);
+        }
+        prev = now;
       });
-      h.eq(bad, 0, 'пинов, перекрытых шапкой или панелью');
+    },
+  },
+  {
+    name: 'зум: стопка раскрывается на отдельные пины',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => !!document.querySelector('.lstack'), 45000, 'стопка пинов');
+      const count = () =>
+        h.page.evaluate(() => document.querySelectorAll('.lpin:not(.hide), .lstack:not(.hide)').length);
+      const before = await count();
+      const box = await h.boxOf(h.page, '.lmap');
+      await h.page.mouse.move(box.x + box.w / 2, box.y + box.h * 0.3);
+      for (let i = 0; i < 5; i++) {
+        await h.page.mouse.wheel({ deltaY: -500 });
+        await h.sleep(250);
+      }
+      await h.sleep(900);
+      const after = await count();
+      h.ok(after > before, `зум не раскрыл стопку: было ${before} меток, стало ${after}`);
+    },
+  },
+  {
+    name: 'шапка и панель закрывают пины, но не стирают их',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin, .lstack').length > 0, 45000, 'пины');
+      const stat = () =>
+        h.page.evaluate(() => {
+          const head = document.querySelector('.mhead').getBoundingClientRect();
+          const foot = document.querySelector('.mbottom').getBoundingClientRect();
+          /* кнопки зума и меню тоже закрывают карту — это нормальный слой интерфейса */
+          const controls = [...document.querySelectorAll('.maplibregl-ctrl')].map((c) => c.getBoundingClientRect());
+          const out = { total: 0, zero: 0, coveredHeader: 0, coveredControls: 0, dead: 0, outside: 0 };
+          /* маркер за пределами экрана: он не спрятан, он вне поля зрения */
+          const vp = { top: 0, left: 0, right: innerWidth, bottom: innerHeight };
+          for (const el of document.querySelectorAll('.lpin:not(.hide), .lstack:not(.hide)')) {
+            const r = el.getBoundingClientRect();
+            out.total++;
+            if (!r.width || !r.height) {
+              out.zero++;
+              continue;
+            }
+            const hits = (b) => r.bottom > b.top && r.top < b.bottom && r.right > b.left && r.left < b.right;
+            if (!hits(vp)) {
+              out.outside++;
+              continue;
+            }
+            if (hits(head) || hits(foot)) {
+              out.coveredHeader++;
+              continue;
+            }
+            if (controls.some(hits)) {
+              out.coveredControls++;
+              continue;
+            }
+            /* пин обязан ловить курсор хотя бы где-то: соседний пин может
+               закрывать часть, но не весь */
+            let hit = false;
+            for (let gx = 0.15; gx <= 0.85 && !hit; gx += 0.35) {
+              for (let gy = 0.15; gy <= 0.85 && !hit; gy += 0.35) {
+                const top = document.elementFromPoint(r.x + r.width * gx, r.y + r.height * gy);
+                if (top && el.contains(top)) hit = true;
+              }
+            }
+            if (!hit) out.dead++;
+          }
+          return out;
+        });
+      let s = await stat();
+      for (let i = 0; i < 3 && s.coveredHeader === 0; i++) {
+        const spot = await freeSpot(h.page);
+        h.ok(!!spot, 'на карте нет свободного места для драга');
+        await pan(h.page, spot, 0, 260, 10);
+        s = await stat();
+      }
+      h.ok(s.total > 0, 'на карте нет ни одного пина');
+      h.eq(s.zero, 0, 'пинов нулевого размера (спрятаны стилями, а не закрыты панелью)');
+      h.eq(s.dead, 0, 'видимых пинов, по которым не попасть курсором');
+      h.ok(s.coveredHeader > 0, 'не удалось завести пин под шапку или панель — проверка ничего не проверила');
     },
   },
   {

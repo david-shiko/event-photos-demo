@@ -129,9 +129,7 @@
 
 /* ---------- стопка пинов и герой на дальнем зуме ---------- */
 .lpin.hide,
-.lstack.hide,
-.lpin.offscreen,
-.lstack.offscreen { display: none; }
+.lstack.hide { display: none; }
 
 .lstack {
   position: absolute;
