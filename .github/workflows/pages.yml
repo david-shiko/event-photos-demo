@@ -54,6 +54,8 @@ jobs:
           name: site
           path: out
       - name: Проверки настоящим вводом
+        env:
+          QA_PREFIX: /${{ github.event.repository.name }}
         run: npm run qa
 
   deploy:

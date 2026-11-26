@@ -34,6 +34,7 @@ export async function openSite(url) {
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + String(e).slice(0, 200)));
   page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text().slice(0, 200)));
+  page.on('response', (r) => r.status() >= 400 && errors.push(`http ${r.status()}: ${r.url().slice(0, 120)}`));
   return { browser, page, errors, url };
 }
 

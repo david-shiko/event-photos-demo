@@ -20,9 +20,17 @@ const MIME = {
 
 // Отдаёт собранную статику из out/. Без зависимостей: тест должен запускаться
 // на чистом npm ci и в CI, где ничего не установлено кроме devDependencies.
-export function serveSite(root = ROOT) {
+export function serveSite(root = ROOT, prefix = '') {
   const server = http.createServer((req, res) => {
-    const path = decodeURIComponent((req.url || '/').split('?')[0]);
+    let path = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (prefix) {
+      if (path === prefix) path = '/';
+      else if (path.startsWith(prefix + '/')) path = path.slice(prefix.length);
+      else {
+        res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
+        return;
+      }
+    }
     let file = normalize(join(root, path));
     if (!file.startsWith(root)) {
       res.writeHead(403).end('forbidden');
@@ -43,7 +51,7 @@ export function serveSite(root = ROOT) {
   return new Promise((ok, fail) => {
     server.once('error', fail);
     server.listen(0, '127.0.0.1', () => {
-      ok({ server, url: `http://127.0.0.1:${server.address().port}`, root });
+      ok({ server, url: `http://127.0.0.1:${server.address().port}${prefix}`, root });
     });
   });
 }

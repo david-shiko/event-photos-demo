@@ -6,7 +6,8 @@ import pages from './checks/pages.mjs';
 
 // QA_BASE=https://... — прогон по живому сайту вместо локальной сборки.
 const remote = process.env.QA_BASE;
-const site = remote ? { server: null, url: remote } : await serveSite();
+const prefix = process.env.QA_PREFIX ?? '';
+const site = remote ? { server: null, url: remote } : await serveSite(undefined, prefix);
 const { server, url } = site;
 const { browser, page, errors } = await openSite(url);
 
