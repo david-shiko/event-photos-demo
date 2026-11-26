@@ -294,9 +294,11 @@
   left: 0;
   right: 0;
   z-index: 4;
-  padding: 14px 16px 26px;
+  padding: 14px 16px 18px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 253, 250, 0.96) 38%, rgba(255, 253, 250, 0));
+  background: var(--panel);
+  border-radius: 0 0 18px 18px;
+  box-shadow: 0 8px 20px rgba(20, 18, 14, 0.07);
 }
 
 .mhdate {
