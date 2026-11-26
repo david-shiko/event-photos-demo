@@ -14,13 +14,14 @@
     "maplibre-gl": "^6.19.0",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "supercluster": "^9.1.0"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "puppeteer-core": "^25.19.0",
+    "playwright-core": "^1.65.1",
     "typescript": "latest"
   }
 }

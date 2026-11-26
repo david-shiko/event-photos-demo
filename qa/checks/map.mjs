@@ -37,6 +37,23 @@ const pan = async (page, spot, dx, dy, steps, onStep) => {
   }
 };
 
+/* Ждём, пока метка перестанет ездить: после загрузки карта ещё доезжает. */
+const stable = async (page, sel) => {
+  let prev = null;
+  for (let i = 0; i < 25; i++) {
+    const r = await page.evaluate((s) => {
+      const el = document.querySelector(s);
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return [Math.round(b.x), Math.round(b.y)];
+    }, sel);
+    if (r && prev && r[0] === prev[0] && r[1] === prev[1]) return r;
+    prev = r;
+    await sleep(120);
+  }
+  throw new Error(`положение ${sel} не стабилизировалось`);
+};
+
 export const state = (page) =>
   page.evaluate(() => {
     const el = document.querySelector('.railscroll');
@@ -158,14 +175,12 @@ export default [
   {
     name: 'лента: свайп пальцем',
     run: async (h) => {
-      await h.page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
       await h.go('/');
       await h.waitFor(() => !!document.querySelector('.raildot'), 15000, 'лента суток');
       const a = await state(h.page);
       const box = await h.boxOf(h.page, '.railscroll');
       await h.touchSwipe(box, -220);
       const b = await state(h.page);
-      await h.page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
       h.ok(b.railMin - a.railMin >= 150, `палец сдвинул ленту на ${b.railMin - a.railMin} мин, ждали ≥150`);
       h.near(mins(b.clock), mins(b.railClock), 6, 'шапка и лента после свайпа');
     },
@@ -227,7 +242,7 @@ export default [
       const box = await h.boxOf(h.page, '.lmap');
       await h.page.mouse.move(box.x + box.w / 2, box.y + box.h * 0.3);
       for (let i = 0; i < 5; i++) {
-        await h.page.mouse.wheel({ deltaY: -500 });
+        await h.page.mouse.wheel(0, -500);
         await h.sleep(250);
       }
       await h.sleep(900);
@@ -300,12 +315,14 @@ export default [
     run: async (h) => {
       await h.go('/');
       await h.waitFor(() => !!document.querySelector('.lstack'), 45000, 'стопка пинов');
+      await stable(h.page, '.lstack');
       const want = await h.page.$eval('.lstack b', (el) => Number(el.textContent));
       h.ok(want >= 5, `в стопке ${want} вечеров, ждали ≥5`);
       await h.click(h.page, '.lstack');
       await h.waitFor(() => !!document.querySelector('.sheet.clist'), 6000, 'лист стопки');
       const rows = await h.page.$$eval('.sheet.clist .srow', (els) => els.length);
-      h.eq(rows, want, 'строк в листе стопки');
+      /* лист показывает первые 15, в заголовке — полное число */
+      h.eq(rows, Math.min(want, 15), 'строк в листе стопки');
       const title = await h.page.$eval('.sheet.clist .srow b', (el) => el.textContent);
       await h.click(h.page, '.sheet.clist .srow');
       await h.sleep(900);
@@ -322,7 +339,7 @@ export default [
       const box = await h.boxOf(h.page, '.lmap');
       await h.page.mouse.move(box.x + box.w / 2, box.y + box.h / 2);
       for (let i = 0; i < 6; i++) {
-        await h.page.mouse.wheel({ deltaY: 400 });
+        await h.page.mouse.wheel(0, 400);
         await h.sleep(220);
       }
       await h.waitFor(() => !!document.querySelector('.lhero'), 6000, 'герой-пин на дальнем зуме');

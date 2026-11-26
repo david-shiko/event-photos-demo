@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer-core';
+import { chromium } from 'playwright-core';
 import { existsSync } from 'node:fs';
 
 const CANDIDATES = [
@@ -18,10 +18,12 @@ export function chromePath() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function openSite(url) {
-  const browser = await puppeteer.launch({
+/* Движок — Playwright, браузер — системный Chrome: свои скриншоты, видео и CDP
+   не пишем, всё есть в движке. */
+export async function openSite(url, opts = {}) {
+  const browser = await chromium.launch({
     executablePath: chromePath(),
-    headless: 'new',
+    headless: true,
     args: [
       '--no-sandbox',
       '--hide-scrollbars',
@@ -29,8 +31,14 @@ export async function openSite(url) {
       '--proxy-bypass-list=127.0.0.1;localhost',
     ],
   });
-  const page = await browser.newPage();
-  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    ignoreHTTPSErrors: true,
+    /* видео пишет движок: свой скринкаст не нужен */
+    ...(opts.video ? { recordVideo: { dir: opts.videoDir ?? 'qa-shots/video', size: { width: 390, height: 844 } } } : {}),
+  });
+  const page = await context.newPage();
   /* GitHub Pages через прокси отдаёт документ по 10–20 секунд */
   page.setDefaultNavigationTimeout(75000);
   page.setDefaultTimeout(20000);
@@ -38,23 +46,24 @@ export async function openSite(url) {
   page.on('pageerror', (e) => errors.push('pageerror: ' + String(e).slice(0, 200)));
   page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text().slice(0, 200)));
   page.on('response', (r) => r.status() >= 400 && errors.push(`http ${r.status()}: ${r.url().slice(0, 120)}`));
-  return { browser, page, errors, url };
+  return { browser, context, page, errors, url };
 }
 
 // Настоящий клик мышью по центру элемента. Только он считается проверкой:
 // element.click() из кода проходит мимо pointer- и touch-обработчиков.
 export async function click(page, selector, index = 0, label = selector) {
   const box = await page.evaluate(
-    (sel, i) => {
+    ([sel, i]) => {
       const el = document.querySelectorAll(sel)[i];
       if (!el) return null;
-      el.scrollIntoView({ block: 'center', inline: 'center' });
+      /* пины живут в карте: scrollIntoView сдвигает их, а карта возвращает обратно,
+         и клик уходит в пустоту */
+      if (!el.closest('.lmap')) el.scrollIntoView({ block: 'center', inline: 'center' });
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height) return null;
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     },
-    selector,
-    index,
+    [selector, index],
   );
   if (!box) throw new Error(`не найден элемент: ${label}`);
   await page.mouse.click(box.x, box.y);
@@ -63,14 +72,13 @@ export async function click(page, selector, index = 0, label = selector) {
 
 export async function boxOf(page, selector, index = 0) {
   return page.evaluate(
-    (sel, i) => {
+    ([sel, i]) => {
       const el = document.querySelectorAll(sel)[i];
       if (!el) return null;
       const r = el.getBoundingClientRect();
       return { x: r.x, y: r.y, w: r.width, h: r.height };
     },
-    selector,
-    index,
+    [selector, index],
   );
 }
 
@@ -90,7 +98,7 @@ export async function dragX(page, box, dx, yInSet = 40, steps = 14) {
 
 // Свайп пальцем: лента должна ехать на телефоне так же, как мышью.
 export async function touchSwipe(page, box, dx, yInSet = 45, steps = 12) {
-  const cdp = await page.createCDPSession();
+  const cdp = await page.context().newCDPSession(page);
   const y = Math.round(box.y + yInSet);
   const x0 = Math.round(dx > 0 ? box.x + 60 : box.x + box.w - 60);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y }] });

@@ -2,6 +2,7 @@
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import Link from 'next/link';
+import Supercluster from 'supercluster';
 import { useEffect, useRef, useState } from 'react';
 import { asset, plural, type MapEvent } from '@/lib/data';
 
@@ -141,42 +142,33 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
       }
       const merged = [...byVenue.values()].map(spread);
 
-      /* «пять и больше в пятне»: близкие на экране группы — одна стопка */
-      const near = new Set<Group>();
-      const clusters: Group[] = [];
-      for (const g of merged) {
-        if (near.has(g)) continue;
-        const p = m.project([g.lng, g.lat]);
-        const items = [...g.items];
-        near.add(g);
-        for (const other of merged) {
-          if (near.has(other)) continue;
-          const q = m.project([other.lng, other.lat]);
-          if (Math.hypot(q.x - p.x, q.y - p.y) < 44) {
-            items.push(...other.items);
-            near.add(other);
-          }
-        }
-        clusters.push(spread(items));
-      }
-      /* стопки не должны стоять вплотную: склеиваем и их, пока не разъедутся */
-      let guard = 0;
-      let again = true;
-      while (again && guard++ < 6) {
-        again = false;
-        for (let i = 0; i < clusters.length && !again; i++) {
-          const p = m.project([clusters[i].lng, clusters[i].lat]);
-          for (let j = i + 1; j < clusters.length; j++) {
-            const q = m.project([clusters[j].lng, clusters[j].lat]);
-            if (Math.hypot(q.x - p.x, q.y - p.y) >= 62) continue;
-            clusters[i] = spread([...clusters[i].items, ...clusters[j].items]);
-            clusters.splice(j, 1);
-            again = true;
-            break;
-          }
-        }
-      }
-      const next: Group[] = clusters;
+      /* группировку считает supercluster — тот движок, что MapLibre держит внутри.
+         Свой обход пикселей умел залипать: стопка не раскрывалась при зуме. */
+      const index = new Supercluster<{ ids: string[] }, { ids: string[] }>({
+        radius: 26,
+        maxZoom: 15,
+        /* копия обязательна: reduce мутирует аккумулятор, а он же — массив точки */
+        map: (p) => ({ ids: [...p.ids] }),
+        reduce: (acc, p) => {
+          acc.ids = acc.ids.concat(p.ids);
+        },
+      });
+      index.load(
+        merged.map((g) => ({
+          type: 'Feature' as const,
+          properties: { ids: g.items.map((i) => i.id) },
+          geometry: { type: 'Point' as const, coordinates: [g.lng, g.lat] },
+        })),
+      );
+
+      const byId = new Map(events.map((e) => [e.id, e]));
+      const shown = index.getClusters([-180, -85, 180, 85], Math.round(m.getZoom()));
+      const next: Group[] = shown.map((f) => {
+        const ids = f.properties.ids ?? [];
+        const items = ids.map((id) => byId.get(id)).filter((e): e is MapEvent => !!e);
+        const [lng, lat] = f.geometry.coordinates;
+        return { items, lng, lat };
+      });
       groups.current = next;
 
       const keys = new Set(next.map((g) => g.items.map((i) => i.id).sort().join('+')));
