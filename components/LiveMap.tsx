@@ -1,11 +1,12 @@
 'use client';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { asset, type MapEvent } from '@/lib/data';
 
 type Props = {
   events: MapEvent[];
+  dim?: string[];
   activeId: string;
   onPick: (id: string) => void;
 };
@@ -13,10 +14,11 @@ type Props = {
 const STYLE = 'https://tiles.openfreemap.org/styles/positron';
 const CENTER: [number, number] = [37.628, 55.7505];
 
-export default function LiveMap({ events, activeId, onPick }: Props) {
+export default function LiveMap({ events, dim = [], activeId, onPick }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<import('maplibre-gl').Map | null>(null);
   const pins = useRef<Map<string, import('maplibre-gl').Marker>>(new Map());
+  const [loaded, setLoaded] = useState(false);
   const pick = useRef(onPick);
   const ready = useRef(false);
   const initial = useRef(events);
@@ -52,6 +54,7 @@ export default function LiveMap({ events, activeId, onPick }: Props) {
 
       m.on('load', () => {
         ready.current = true;
+        setLoaded(true);
 
         /* подписи по-русски, где они есть в данных */
         m.getStyle()?.layers?.forEach((l) => {
@@ -125,7 +128,9 @@ export default function LiveMap({ events, activeId, onPick }: Props) {
             .addTo(m);
           pins.current.set(e.id, marker);
         }
-        marker.getElement().classList.toggle('on', e.id === activeId);
+        const el = marker.getElement();
+        el.classList.toggle('on', e.id === activeId);
+        el.classList.toggle('dim', dim.includes(e.id));
       });
     };
 
@@ -141,7 +146,7 @@ export default function LiveMap({ events, activeId, onPick }: Props) {
     return () => {
       dead = true;
     };
-  }, [events, activeId]);
+  }, [events, activeId, dim]);
 
   /* выбранный вечер — в центр, если он уехал за край */
   useEffect(() => {
@@ -155,5 +160,10 @@ export default function LiveMap({ events, activeId, onPick }: Props) {
     if (out) m.easeTo({ center: [e.lng, e.lat], duration: 450 });
   }, [activeId, events]);
 
-  return <div ref={box} className="lmap" aria-label="Карта вечеров" />;
+  return (
+    <>
+      <div ref={box} className="lmap" aria-label="Карта вечеров" />
+      {!loaded && <span className="lmap-load">карта загружается…</span>}
+    </>
+  );
 }

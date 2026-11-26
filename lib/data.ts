@@ -214,6 +214,39 @@ export const mapEvents: MapEvent[] = [
     lng: 37.6241,
   },
   {
+    id: 'vypusk',
+    title: 'Выпускной',
+    venue: 'Парк Горького',
+    when: '12 июля, 18:00–01:00',
+    frames: 210,
+    sources: 32,
+    img: asset('/img/vl2.png'),
+    lat: 55.7306,
+    lng: 37.6013,
+  },
+  {
+    id: 'sosedi',
+    title: 'Ужин соседей',
+    venue: 'Таганка',
+    when: '12 июля, 20:00–23:00',
+    frames: 64,
+    sources: 9,
+    img: asset('/img/vp6.png'),
+    lat: 55.7439,
+    lng: 37.6492,
+  },
+  {
+    id: 'kino',
+    title: 'Кино на крыше',
+    venue: 'Крыша на Пресне',
+    when: '14 июля, 21:00–00:30',
+    frames: 38,
+    sources: 7,
+    img: asset('/img/vl7.png'),
+    lat: 55.7691,
+    lng: 37.5931,
+  },
+  {
     id: 'tochki',
     title: 'Корпоратив «Точки»',
     venue: 'Офис на Ленинском',
@@ -355,4 +388,34 @@ export const moments: Record<string, { time: string; text: string }> = {
   'vinzavod': { time: '20:00', text: 'первый зал' },
   'kassety': { time: '23:00', text: 'вышли на бис' },
   'mark-bday': { time: '23:00', text: 'торт на крыше' },
+};
+
+/** Семь дней вокруг вечера: полоса дней на карте. */
+export const DAYS = [
+  { label: '10 июля', short: 'чт', dow: 'четверг' },
+  { label: '11 июля', short: 'пт', dow: 'пятница' },
+  { label: '12 июля', short: 'сб', dow: 'суббота' },
+  { label: '13 июля', short: 'вс', dow: 'воскресенье' },
+  { label: '14 июля', short: 'пн', dow: 'понедельник' },
+  { label: '15 июля', short: 'вт', dow: 'вторник' },
+  { label: '16 июля', short: 'ср', dow: 'среда' },
+];
+
+export const dayIndex = (label: string) => DAYS.findIndex((d) => d.label === label);
+
+/** Начало вечера на общей шкале: 0 = 10 июля, 00:00. */
+export const eventSpan = (e: MapEvent) => {
+  const idx = Math.max(0, dayIndex(e.when.split(', ')[0]));
+  const { from, to } = windowMinutes(e.when);
+  const start = idx * 1440 + from;
+  return { start, end: idx * 1440 + to };
+};
+
+/** Минуты на шкале → «21:40» и день. */
+export const clockOf = (m: number) => {
+  const day = Math.floor(m / 1440);
+  const rest = ((m % 1440) + 1440) % 1440;
+  const hh = String(Math.floor(rest / 60)).padStart(2, '0');
+  const mm = String(rest % 60).padStart(2, '0');
+  return { time: `${hh}:${mm}`, day, label: DAYS[Math.max(0, Math.min(6, day))].label };
 };

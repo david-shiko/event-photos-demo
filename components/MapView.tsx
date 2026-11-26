@@ -4,216 +4,177 @@ import Link from 'next/link';
 import { useState } from 'react';
 import Shell from './Shell';
 import LiveMap from './LiveMap';
-import { asset, evenings, frames, mapEvents, sources, windowMinutes } from '@/lib/data';
-import WhenSheet from './WhenSheet';
+import DayStrip from './DayStrip';
+import TimeRail from './TimeRail';
+import { asset, clockOf, DAYS, eventSpan, frames, mapEvents, plural, sources } from '@/lib/data';
 import { useCopy } from '@/lib/client';
 
-type Filter = 'all' | 'near' | 'live' | 'video';
-
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'Сегодня' },
-  { id: 'near', label: 'Рядом' },
-  { id: 'live', label: 'С кадрами' },
-  { id: 'video', label: 'С видео' },
-];
-
-const VIDEO = ['vinzavod', 'kassety'];
-const CENTER = { lat: 55.7522, lng: 37.6300 };
+const NOW = 1440 + 21 * 60 + 40; // 11 июля, 21:40 — «сейчас» в демо
+const START = 0; // 10 июля, 00:00
+const END = 7 * 1440; // 17 июля, 00:00
+const DIM = 30; // минут до начала, когда пин бледнеет
+const TAIL = 30; // минут после конца, когда пин ещё виден
 
 export default function MapView() {
-  const [filter, setFilter] = useState<Filter>('all');
+  const [chosen, setChosen] = useState(NOW);
   const [picked, setPicked] = useState('7kd2qf9xm');
-  const [sheet, setSheet] = useState(false);
   const [open, setOpen] = useState(false);
-  const [when, setWhen] = useState(false);
-  const [date, setDate] = useState('11 июля');
-  const [hour, setHour] = useState<number | null>(null);
+  const [sheet, setSheet] = useState(false);
   const [asked, setAsked] = useState(false);
   const { done: copied, copy } = useCopy();
 
-  const visible = mapEvents.filter((e) => {
-    if (e.when.split(', ')[0] !== date) return false;
-    if (hour !== null) {
-      const { from, to } = windowMinutes(e.when);
-      if (hour < from || hour >= to) return false;
-    }
-    if (filter === 'near') {
-      const d = Math.hypot(e.lat - CENTER.lat, e.lng - CENTER.lng);
-      return d < 0.045;
-    }
-    if (filter === 'live') return e.frames > 0;
-    if (filter === 'video') return VIDEO.includes(e.id);
-    return true;
-  });
+  const clock = clockOf(chosen);
+  const day = Math.max(0, Math.min(6, clock.day));
+  const dayEvents = mapEvents.filter((e) => e.when.split(', ')[0] === DAYS[day].label);
 
-  const current = mapEvents.find((e) => e.id === picked) ?? mapEvents[0];
-  const total = mapEvents.reduce((s, e) => s + e.frames, 0);
-  const clock = (m: number) =>
-    `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-  const liveFrames = visible.reduce((s, e) => s + e.frames, 0);
+  const spans = mapEvents.map((e) => ({ e, ...eventSpan(e) }));
+  const shown = spans
+    .filter((s) => chosen >= s.start - DIM && chosen <= s.end + TAIL)
+    .map((s) => s.e);
+  const dim = spans.filter((s) => s.start > chosen).map((s) => s.e.id);
+
+  const next = spans
+    .filter((s) => s.start > chosen)
+    .sort((a, b) => a.start - b.start)[0];
+  const last = spans
+    .filter((s) => s.end < chosen)
+    .sort((a, b) => b.end - a.end)[0];
+
+  const current =
+    mapEvents.find((e) => e.id === picked && shown.some((s) => s.id === picked)) ??
+    shown[0] ??
+    mapEvents[0];
+
+  const ready = dayEvents.filter((e) => e.frames > 0);
+  const people = dayEvents.reduce((s, e) => s + e.sources, 0);
 
   return (
     <Shell
       active="Карта"
       title="Карта"
-      caption="Ссылку кидают в чат и через месяц не находят. Карта — единственное место, где вечера остаются и находятся."
+      caption="Город, в котором прямо сейчас что-то происходит. Тяните ленту суток — под стрелкой встаёт новое время, пины зажигаются и гаснут."
       note={
         <>
-          <b>{total} кадров с {mapEvents.length} вечеров</b> в одну ночь, и это только Москва. То,
-          что было вчера в баре на Солянке, видно сегодня. Ссылкой такого не получить.
+          <b>Почему это работает.</b> Карта отвечает на «где и когда» — сайт вечера отвечает на
+          «что там было». Ни у одного сервиса нет карты, которая живёт по времени.
         </>
       }
     >
       <div className="mapwrap">
         <LiveMap
-          events={visible}
-          activeId={picked}
+          events={shown}
+          dim={dim}
+          activeId={current.id}
           onPick={(id) => {
             setPicked(id);
             setOpen(false);
           }}
         />
 
-        <div className="maphead">
-          <div className="mpills">
-            <button className="city" onClick={() => setWhen(true)}>
-              ◷ Москва · {date}
-              {hour !== null && `, ${clock(hour)}`}
-              <i>⌄</i>
-            </button>
-            <span className="me">◎</span>
+        <div className="mhead">
+          <div className="mhdate">
+            {DAYS[day].label}, {DAYS[day].dow}
           </div>
-          <div className="mlive">
-            <span className="dot-ok" />
-            {visible.length === 0 ? (
-              <>вечеров на {date} пока нет</>
-            ) : hour === null ? (
-              <>
-                сейчас снимают <b>12</b> человек · {evenings(mapEvents.length)}
-              </>
-            ) : (
-              <>
-                в {clock(hour)} идёт {evenings(visible.length)} · <b>{liveFrames}</b> кадров
-              </>
-            )}
+          <div className="mhrow">
+            <div className="mhtime">{clock.time}</div>
+            <div className="mhcount">
+              {dayEvents.length} {plural(dayEvents.length, 'событие', 'события', 'событий')}
+            </div>
           </div>
-          <div className="mchips">
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                className={`mchip ${filter === f.id ? 'on' : ''}`}
-                onClick={() => setFilter(f.id)}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="mhsub">
+            фото готовы у {ready.length} · {sources(people)}
           </div>
         </div>
 
-        {visible.length > 0 && (
-        <div className={`msheet ${open ? 'open' : ''}`}>
-          <button className="grab" onClick={() => setOpen(!open)} aria-label="Развернуть карточку" />
-          <div className="row" onClick={() => setOpen(!open)}>
-            <div className="cv" style={{ backgroundImage: `url(${current.img})` }} />
-            <div className="meta">
-              <div className="t">{current.title}</div>
-              <div className="l">
-                {current.venue} · {current.when}
+        <div className="mbottom">
+          {shown.length > 0 ? (
+            <div className={`mcard ${open ? 'open' : ''}`}>
+              <button className="grab" onClick={() => setOpen(!open)} aria-label="Развернуть карточку" />
+              <div className="row" onClick={() => setOpen(!open)}>
+                <div className="cv" style={{ backgroundImage: `url(${current.img})` }} />
+                <div className="meta">
+                  <div className="t">{current.title}</div>
+                  <div className="l">
+                    {current.venue} · {current.when.split(', ')[1]}
+                  </div>
+                  <div className="s">
+                    {current.soon ? (
+                      <>◷ вечер начнётся в {current.when.split(', ')[1].split('–')[0]}</>
+                    ) : (
+                      <>
+                        <span className="dot-ok" />
+                        {frames(current.frames)} · {sources(current.sources)}
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span className="chev">{open ? '⌄' : '⌃'}</span>
               </div>
-              <div className="s">
-                {current.locked ? (
-                  <>⌂ кадры откроет организатор</>
-                ) : current.soon ? (
-                  <>◷ вечер начнётся в 20:00</>
-                ) : (
-                  <>
-                    <span className="dot-ok" />
-                    {frames(current.frames)} · {sources(current.sources)}
-                  </>
-                )}
-              </div>
-            </div>
-            <span className="chev">{open ? '⌄' : '⌃'}</span>
-          </div>
 
-          {open && !current.locked && !current.soon && (
-            <div className="thumbs">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  style={{ backgroundImage: `url(${asset(`/img/p${(i % 8) + 1}.png`)})` }}
-                />
-              ))}
+              {open && !current.soon && (
+                <div className="thumbs">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      style={{ backgroundImage: `url(${asset(`/img/p${(i % 8) + 1}.png`)})` }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {open && (
+                <div className="btns">
+                  {current.soon ? (
+                    <button className="ghost" onClick={() => setAsked(true)}>
+                      {asked ? 'напомним' : 'напомнить о начале'}
+                    </button>
+                  ) : (
+                    <Link className="cta" href={`/e/${current.id}/`}>
+                      Открыть вечер
+                    </Link>
+                  )}
+                  <button className="ghost" onClick={() => setSheet(true)}>
+                    Ссылка
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mempty">
+              <b>
+                {clock.time} — пока пусто
+              </b>
+              <span>
+                {next
+                  ? `Ближайший — «${next.e.title}» в ${clockOf(next.start).time}`
+                  : last
+                    ? `Последний был «${last.e.title}», закончился в ${clockOf(last.end).time}`
+                    : 'В этот день вечеров нет.'}
+              </span>
+              {(next || last) && (
+                <button onClick={() => setChosen(next ? next.start + 20 : last.start + 20)}>
+                  {next ? 'к нему' : 'вернуться к нему'}
+                </button>
+              )}
             </div>
           )}
 
-          {open && (
-          <div className="btns">
-            {current.locked ? (
-              <button className="cta" onClick={() => setAsked(true)}>
-                {asked ? 'Запрос отправлен' : 'Просить доступ'}
-              </button>
-            ) : current.soon ? (
-              <button className="cta off">Откроется в 20:00</button>
-            ) : (
-              <Link className="cta" href={`/e/${current.id}/`}>
-                Открыть вечер
-              </Link>
-            )}
-            {!current.soon && (
-              <button className="ghost" onClick={() => setSheet(true)}>
-                Ссылка
-              </button>
-            )}
-          </div>
-          )}
-          {open && (
-          <div className="hint">
-            {current.soon
-              ? 'точка появилась заранее — гости уже знают, где искать кадры'
-              : current.locked
-                ? 'вечер на карте, кадры закрыты'
-                : `${frames(current.frames)} · ссылка живёт 90 дней`}
-          </div>
-          )}
-          {!open && (
-            <div className="peek">
-              {current.soon ? 'вечер начнётся в 20:00' : current.locked ? 'кадры закрыты' : 'нажмите, чтобы открыть вечер'}
-            </div>
-          )}
-          <div className="mcredit">карта © OpenStreetMap, © OpenFreeMap</div>
+          <DayStrip
+            day={day}
+            events={mapEvents}
+            onPick={(d) => setChosen(d * 1440 + (chosen % 1440))}
+          />
+
+          <TimeRail
+            from={START}
+            to={END}
+            chosen={chosen}
+            now={NOW}
+            events={mapEvents}
+            onChange={setChosen}
+          />
         </div>
-        )}
       </div>
-
-      {visible.length === 0 && (
-        <div className="mempty">
-          <b>На {date} вечеров пока нет</b>
-          <span>Карта наполняется в день вечера. Пока можно посмотреть 11 июля.</span>
-          <button
-            onClick={() => {
-              setDate('11 июля');
-              setHour(null);
-            }}
-          >
-            Вернуться на 11 июля
-          </button>
-        </div>
-      )}
-
-      {when && (
-        <WhenSheet
-          events={mapEvents}
-          date={date}
-          hour={hour}
-          onClose={() => setWhen(false)}
-          onApply={(d, h) => {
-            setDate(d);
-            setHour(h);
-            setWhen(false);
-          }}
-        />
-      )}
 
       {sheet && (
         <>
@@ -226,10 +187,7 @@ export default function MapView() {
             </div>
             <div className="lnk">event.photos/s/{current.id}</div>
             <div className="row2">
-              <button
-                className="primary"
-                onClick={() => copy(`https://event.photos/s/${current.id}`)}
-              >
+              <button className="primary" onClick={() => copy(`https://event.photos/s/${current.id}`)}>
                 {copied ? 'Скопировано ✓' : 'Скопировать'}
               </button>
               <a className="ghost2" href={asset('/img/qr.png')} download="vecher-qr.png">
