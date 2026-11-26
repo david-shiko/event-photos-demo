@@ -5,8 +5,7 @@ import Shell from './Shell';
 import LiveMap from './LiveMap';
 import DayStrip from './DayStrip';
 import TimeRail from './TimeRail';
-import { asset, clockOf, DAYS, eventSpan, frames, mapEvents, plural, sources, type MapEvent } from '@/lib/data';
-import { useCopy } from '@/lib/client';
+import { clockOf, DAYS, eventSpan, frames, mapEvents, plural, sources, type MapEvent } from '@/lib/data';
 
 const NOW = 1440 + 21 * 60 + 40; // 11 июля, 21:40 — «сейчас» в демо
 const START = 0; // 10 июля, 00:00
@@ -14,19 +13,19 @@ const END = 7 * 1440; // 17 июля, 00:00
 const DIM = 30; // минут до начала, когда пин бледнеет
 const TAIL = 30; // минут после конца, когда пин ещё виден
 
+const onMap = mapEvents.filter((e) => !e.hidden);
+
 export default function MapView() {
   const [chosen, setChosen] = useState(NOW);
   const [picked, setPicked] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [cluster, setCluster] = useState<MapEvent[] | null>(null);
-  const [sheet, setSheet] = useState(false);
-  const { done: copied, copy } = useCopy();
 
   const clock = clockOf(chosen);
   const day = Math.max(0, Math.min(6, clock.day));
-  const dayEvents = mapEvents.filter((e) => e.when.split(', ')[0] === DAYS[day].label);
+  const dayEvents = onMap.filter((e) => e.when.split(', ')[0] === DAYS[day].label);
 
-  const spans = mapEvents.map((e) => ({ e, ...eventSpan(e) }));
+  const spans = onMap.map((e) => ({ e, ...eventSpan(e) }));
   const shown = spans
     .filter((s) => chosen >= s.start - DIM && chosen <= s.end + TAIL)
     .map((s) => s.e);
@@ -38,8 +37,6 @@ export default function MapView() {
   const last = spans
     .filter((s) => s.end < chosen)
     .sort((a, b) => b.end - a.end)[0];
-
-  const current = mapEvents.find((e) => e.id === picked) ?? shown[0] ?? mapEvents[0];
 
   const ready = dayEvents.filter((e) => e.frames > 0);
   const people = dayEvents.reduce((s, e) => s + e.sources, 0);
@@ -117,7 +114,7 @@ export default function MapView() {
 
           <DayStrip
             day={day}
-            events={mapEvents}
+            events={onMap}
             onPick={(d) => setChosen(d * 1440 + (chosen % 1440))}
           />
 
@@ -126,7 +123,7 @@ export default function MapView() {
             to={END}
             chosen={chosen}
             now={NOW}
-            events={mapEvents}
+            events={onMap}
             onChange={setChosen}
             onEvent={pickPin}
           />
@@ -153,33 +150,6 @@ export default function MapView() {
                 <span className="ch">›</span>
               </button>
             ))}
-          </div>
-        </>
-      )}
-
-      {sheet && (
-        <>
-          <button className="scrim" onClick={() => setSheet(false)} aria-label="Закрыть" />
-          <div className="sheet">
-            <div className="grab" />
-            <div className="st">Ссылка и QR</div>
-            <div className="qrw">
-              <img src={asset('/img/qr.png')} width={168} height={168} alt="QR вечера" />
-            </div>
-            <div className="lnk">event.photos/s/{current.id}</div>
-            <div className="row2">
-              <button className="primary" onClick={() => copy(`https://event.photos/s/${current.id}`)}>
-                {copied ? 'Скопировано ✓' : 'Скопировать'}
-              </button>
-              <a className="ghost2" href={asset('/img/qr.png')} download="vecher-qr.png">
-                Скачать QR
-              </a>
-            </div>
-            <div className="hint3">
-              QR печатают на карточках и ставят на столах.
-              <br />
-              Работает до 11 октября.
-            </div>
           </div>
         </>
       )}

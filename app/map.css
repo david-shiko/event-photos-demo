@@ -128,7 +128,10 @@
 .lpin:hover .pc { border-color: var(--ink); }
 
 /* ---------- стопка пинов и герой на дальнем зуме ---------- */
-.lpin.hide { display: none; }
+.lpin.hide,
+.lstack.hide,
+.lpin.offscreen,
+.lstack.offscreen { display: none; }
 
 .lstack {
   position: absolute;

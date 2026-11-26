@@ -29,7 +29,7 @@ export default function Lightbox({
         <button className="rb" onClick={onClose} aria-label="Закрыть">
           ✕
         </button>
-        <span className="rb">⋯</span>
+
       </div>
 
       {i > 0 && (
@@ -48,7 +48,7 @@ export default function Lightbox({
           {photo.time} · {photo.source === 'guest' ? 'гость' : 'фотограф'}
         </div>
         <div className="s">
-          {i + 1} из {photos.length} · {photo.likes} ♥ · 2400 × 3600
+          {i + 1} из {photos.length} · {photo.likes + (isLiked ? 1 : 0)} ♥ · 2400 × 3600
         </div>
         <div className="acts">
           <button
@@ -59,7 +59,9 @@ export default function Lightbox({
           >
             ♥ {photo.likes + (isLiked ? 1 : 0)}
           </button>
-          <button>↓ Скачать</button>
+          <a className="save" href={photo.img} download={`vecher-${photo.id + 1}.jpg`}>
+            ↓ Скачать
+          </a>
         </div>
       </div>
     </div>

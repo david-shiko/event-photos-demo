@@ -9,6 +9,7 @@ import { readCreated, type Created } from '@/lib/client';
 export default function Page() {
   const [created, setCreated] = useState<Created[]>([]);
   const [report, setReport] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => setCreated(readCreated()), []);
 
@@ -28,6 +29,8 @@ export default function Page() {
     a.download = 'otchet-noyabr.csv';
     a.click();
     URL.revokeObjectURL(url);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
   };
 
   return (
@@ -95,7 +98,7 @@ export default function Page() {
         ))}
 
         {cabinet.events.map((e) => (
-          <div className="ev" key={e.id}>
+          <Link className="ev" key={e.id} href={`/e/${e.id}/`}>
             <div className="r">
               <div className="im" style={{ backgroundImage: `url(${e.img})` }} />
               <div>
@@ -116,7 +119,7 @@ export default function Page() {
               </span>
               <span className="money">{e.money}</span>
             </div>
-          </div>
+          </Link>
         ))}
 
         <div className="pay">
@@ -166,8 +169,8 @@ export default function Page() {
               файлов забрали.
             </div>
             <div className="row2">
-              <button className="ghost2" onClick={downloadCsv}>
-                Скачать CSV
+              <button className={`ghost2 ${saved ? 'on' : ''}`} onClick={downloadCsv}>
+                {saved ? 'Файл скачан ✓' : 'Скачать CSV'}
               </button>
               <button className="primary" onClick={() => setReport(false)}>
                 Закрыть

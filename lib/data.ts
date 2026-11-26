@@ -108,9 +108,11 @@ const spread = (n: number, from: number, to: number) => {
   return slots.map((s, i) => ({ from: s.from, to: s.to, count: Math.max(0, base[i]) }));
 };
 
-export const makePhotos = (n: number, from: number, to: number): Photo[] => {
+type Bucket = { from: number; to: number; count: number };
+
+export const makePhotos = (buckets: Bucket[], from: number): Photo[] => {
   const out: Photo[] = [];
-  spread(n, from, to).forEach((b, bi) => {
+  buckets.forEach((b, bi) => {
     for (let k = 0; k < b.count; k += 1) {
       const i = out.length;
       const minute = b.from + ((k + 0.5) * (b.to - b.from)) / b.count;
@@ -123,23 +125,24 @@ export const makePhotos = (n: number, from: number, to: number): Photo[] => {
         source: isGuest ? 'guest' : 'photo',
         likes: (i * 37) % 47,
         pos: `${20 + ((i * 13) % 60)}% ${25 + ((i * 17) % 50)}%`,
-        period: `p${bi}`,
+        period: `p${Math.floor((minute - from) / 120)}`,
       });
     }
   });
   return out;
 };
 
-const periodsFor = (n: number, from: number, to: number): Period[] =>
-  splitByTime(n, from, to)
-    .map((b, i) => ({
-      id: `p${i}`,
-      label: `${fmt(b.from)}–${fmt(b.to)}`,
-      count: b.count,
-      from: b.from,
-      to: b.to,
-    }))
-    .filter((p) => p.count > 0);
+/* куски по два часа: чипс и лента считаются из одного и того же поля period */
+const periodsFor = (photos: Photo[], from: number, to: number): Period[] => {
+  const out: Period[] = [];
+  for (let i = 0; from + i * 120 < to; i += 1) {
+    const id = `p${i}`;
+    const count = photos.filter((p) => p.period === id).length;
+    if (!count) continue;
+    out.push({ id, label: `${fmt(from + i * 120)}–${fmt(Math.min(from + (i + 1) * 120, to))}`, count, from: from + i * 120, to: Math.min(from + (i + 1) * 120, to) });
+  }
+  return out;
+};
 
 export type MapEvent = {
   id: string;
@@ -156,6 +159,8 @@ export type MapEvent = {
   featured?: boolean;
   /** кто снимал — первая строка карточки над пином */
   by?: string;
+  /** есть страница, но на карте и в ленте его нет */
+  hidden?: boolean;
 };
 
 export const mapEvents: MapEvent[] = [
@@ -493,6 +498,18 @@ export const mapEvents: MapEvent[] = [
     soon: true,
   },
   {
+    id: 'ny-tochki',
+    title: 'Новогодний корпоратив',
+    venue: 'Лофт «Красный Октябрь»',
+    when: '31 декабря, 20:00–02:00',
+    frames: 0,
+    sources: 0,
+    img: asset('/img/p7.png'),
+    lat: 55.7394,
+    lng: 37.6078,
+    hidden: true,
+  },
+  {
     id: 'izmailovo',
     title: 'Ярмарка в Измайлове',
     venue: 'Измайловский кремль',
@@ -539,6 +556,7 @@ export function eventFor(id: string): Ev {
   const m = mapEvents.find((e) => e.id === id) ?? mapEvents[0];
   const n = m.frames > 0 ? m.frames : 168;
   const { from, to } = parseWindow(m.when);
+  const buckets = spread(n, from, to);
   const [datePart, timePart] = m.when.split(', ');
   const photographer = Math.round((n * 4) / 7);
   return {
@@ -552,8 +570,8 @@ export function eventFor(id: string): Ev {
     cover: m.id === '7kd2qf9xm' ? asset('/img/big.png') : m.img,
     city: 'Москва',
     wasThere: '21:40',
-    photos: makePhotos(n, from, to),
-    periods: periodsFor(n, from, to),
+    photos: makePhotos(buckets, from),
+    periods: periodsFor(makePhotos(buckets, from), from, to),
   };
 }
 

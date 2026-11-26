@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import Lightbox from './Lightbox';
 import Shell from './Shell';
@@ -37,6 +38,22 @@ export default function EventView({ id }: { id: string }) {
     else setOpen(list.findIndex((p) => p.id === id));
   };
 
+  /* выбранное скачивается: по файлу на кадр, без сервера */
+  const savePicked = () => {
+    event.photos
+      .filter((p) => picked.includes(p.id))
+      .forEach((p, i) => {
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = p.img;
+          a.download = `vecher-${event.id}-${p.id + 1}.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }, i * 120);
+      });
+  };
+
   return (
     <Shell
       active="Вечер"
@@ -53,8 +70,9 @@ export default function EventView({ id }: { id: string }) {
         <div className="img2" style={{ backgroundImage: `url(${event.cover})` }} />
         <div className="grad" />
         <div className="bar2">
-          <span className="rb">‹</span>
-          <span className="rb">⋯</span>
+          <Link className="rb" href="/" aria-label="Назад на карту">
+            ‹
+          </Link>
         </div>
         <div className="txt">
           <div className="t">{event.title}</div>
@@ -96,9 +114,15 @@ export default function EventView({ id }: { id: string }) {
         </div>
         <div className="hint2">
           <span>весь вечер {event.window}</span>
-          <button className="fake" onClick={() => setPeriod(period ? null : 'b')}>
-            вы были в {event.wasThere} · сбросить
-          </button>
+          {period ? (
+            <button className="fake" onClick={() => setPeriod(null)}>
+              сбросить фильтр
+            </button>
+          ) : (
+            <span className="fake">
+              вы были в {event.wasThere}
+            </span>
+          )}
         </div>
       </div>
 
@@ -134,15 +158,21 @@ export default function EventView({ id }: { id: string }) {
         <button className="ghost2" onClick={() => setSheet(true)}>
           Ссылка
         </button>
-        <button
-          className="ghost2"
-          onClick={() => {
-            setSelecting(!selecting);
-            setPicked([]);
-          }}
-        >
-          {selecting ? 'Готово' : 'Выбрать'}
-        </button>
+        {selecting && picked.length > 0 ? (
+          <button className="ghost2 on" onClick={savePicked}>
+            Скачать {picked.length}
+          </button>
+        ) : (
+          <button
+            className="ghost2"
+            onClick={() => {
+              setSelecting(!selecting);
+              setPicked([]);
+            }}
+          >
+            {selecting ? 'Готово' : 'Выбрать'}
+          </button>
+        )}
         <span className="cnt">{picked.length > 0 ? `${picked.length} выбрано` : event.window}</span>
         <button className="dl" onClick={() => setOpen(0)} aria-label="Кадр">
           ↓

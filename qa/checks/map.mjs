@@ -5,7 +5,8 @@ export const state = (page) =>
   page.evaluate(() => {
     const el = document.querySelector('.railscroll');
     if (!el) return null;
-    const raw = (el.scrollLeft + el.clientWidth / 2) / (52 / 60);
+    /* лента с отступом в половину ширины: время = scrollLeft / px-за-минуту */
+    const raw = el.scrollLeft / (52 / 60);
     const min = Math.round(raw);
     const t = ((min % 1440) + 1440) % 1440;
     const pad = (x) => String(Math.floor(x)).padStart(2, '0');
@@ -131,6 +132,37 @@ export default [
       await h.page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
       h.ok(b.railMin - a.railMin >= 150, `палец сдвинул ленту на ${b.railMin - a.railMin} мин, ждали ≥150`);
       h.near(mins(b.clock), mins(b.railClock), 6, 'шапка и лента после свайпа');
+    },
+  },
+  {
+    name: 'день: лента встаёт ровно на тот же час',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => !!document.querySelector('.raildot'), 15000, 'лента суток');
+      const before = await state(h.page);
+      await h.click(h.page, '.days button', 6);
+      await h.sleep(1600);
+      const after = await state(h.page);
+      h.ok(after.header.includes('16 июля'), `в шапке «${after.header}»`);
+      h.eq(after.clock, before.clock, 'время при переключении дня');
+      h.near(mins(after.clock), mins(after.railClock), 6, 'шапка и лента после дня 16');
+    },
+  },
+  {
+    name: 'карта: пины не уезжают под шапку и панель',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin').length > 0, 45000, 'пины');
+      await h.sleep(600);
+      const bad = await h.page.evaluate(() => {
+        const head = document.querySelector('.mhead').getBoundingClientRect();
+        const foot = document.querySelector('.mbottom').getBoundingClientRect();
+        return [...document.querySelectorAll('.lpin:not(.hide):not(.offscreen), .lstack:not(.hide):not(.offscreen)')]
+          .map((el) => el.getBoundingClientRect())
+          .filter((r) => r.bottom > head.top && r.top < head.bottom || r.top < foot.bottom && r.bottom > foot.top)
+          .length;
+      });
+      h.eq(bad, 0, 'пинов, перекрытых шапкой или панелью');
     },
   },
   {

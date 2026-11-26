@@ -76,9 +76,9 @@ export default function Creator() {
             ‹
           </button>
         ) : (
-          <span className="rb" style={{ opacity: 0.3 }}>
+          <Link className="rb" href="/photographer/" aria-label="В кабинет">
             ‹
-          </span>
+          </Link>
         )}
         <span className="ttl">{step === 3 ? 'Готово' : step === 2 ? 'Оплата' : 'Новый вечер'}</span>
         <span className="act">{step === 3 ? '6391' : `шаг ${step} из 2`}</span>

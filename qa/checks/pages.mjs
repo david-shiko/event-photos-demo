@@ -47,4 +47,78 @@ export default [
       );
     },
   },
+  {
+    name: 'вечер: чипс периода совпадает с лентой',
+    run: async (h) => {
+      await h.go('/e/7kd2qf9xm/');
+      await h.waitFor(() => document.querySelectorAll('.chip2').length > 0, 15000, 'чипсы');
+      const all = await h.page.$$eval('.feed .th', (els) => els.length);
+      const want = await h.page.$eval('.chip2 b', (el) => Number(el.textContent));
+      await h.click(h.page, '.chip2', 0);
+      await h.sleep(500);
+      const got = await h.page.$$eval('.feed .th', (els) => els.length);
+      h.eq(got, want, 'кадров в ленте против числа на чипсе');
+      h.ok(want < all, `чипс не сузил ленту: было ${all}, стало ${got}`);
+      await h.click(h.page, '.hint2 .fake');
+      await h.sleep(500);
+      const back = await h.page.$$eval('.feed .th', (els) => els.length);
+      h.eq(back, all, 'лента после «сбросить фильтр»');
+    },
+  },
+  {
+    name: 'вечер: назад на карту',
+    run: async (h) => {
+      await h.go('/e/7kd2qf9xm/');
+      await h.waitFor(() => !!document.querySelector('.bar2 .rb'), 15000, 'стрелка назад');
+      await h.click(h.page, '.bar2 .rb');
+      await h.sleep(900);
+      const href = await h.page.evaluate(() => location.pathname);
+      h.eq(href, '/', 'адрес после «назад»');
+    },
+  },
+  {
+    name: 'лайтбокс: скачивание и лайк',
+    run: async (h) => {
+      await h.go('/e/7kd2qf9xm/');
+      await h.waitFor(() => document.querySelectorAll('.feed .th').length > 0, 15000, 'лента кадров');
+      await h.click(h.page, '.feed .th', 0);
+      await h.waitFor(() => !!document.querySelector('.lb'), 6000, 'лайтбокс');
+      const save = await h.page.$eval('.lb .acts .save', (el) => ({
+        tag: el.tagName,
+        href: el.getAttribute('href'),
+        download: el.getAttribute('download'),
+      }));
+      h.eq(save.tag, 'A', 'кнопка скачивания — ссылка на файл');
+      h.ok(!!save.href && /\.png$/.test(save.href), `href у скачивания: ${save.href}`);
+      h.ok(!!save.download, 'у ссылки нет атрибута download');
+      await h.click(h.page, '.lb .acts button', 0);
+      await h.sleep(300);
+      const meta = await h.page.$eval('.lb .meta .s', (el) => el.textContent);
+      h.ok(/1 ♥/.test(meta), `в строке кадра не обновился лайк: ${meta}`);
+    },
+  },
+  {
+    name: 'кабинет: карточка вечера открывается',
+    run: async (h) => {
+      await h.go('/photographer/');
+      await h.waitFor(() => document.querySelectorAll('.cab .ev').length > 0, 15000, 'карточки вечеров');
+      const id = await h.page.$eval('.cab .ev', (el) => el.getAttribute('href'));
+      h.ok(!!id && id.startsWith('/e/'), `карточка вечера не ссылка: ${id}`);
+      await h.click(h.page, '.cab .ev');
+      await h.sleep(900);
+      const path = await h.page.evaluate(() => location.pathname);
+      h.eq(path, id, 'адрес после клика по карточке вечера');
+    },
+  },
+  {
+    name: 'загрузка: способ переключается',
+    run: async (h) => {
+      await h.go('/u/');
+      await h.waitFor(() => document.querySelectorAll('.upl .who button').length > 0, 15000, 'переключатель способа');
+      await h.click(h.page, '.upl .who button', 1);
+      await h.sleep(300);
+      const on = await h.page.$$eval('.upl .who button', (els) => els.findIndex((e) => e.classList.contains('on')));
+      h.eq(on, 1, 'активный способ загрузки');
+    },
+  },
 ];

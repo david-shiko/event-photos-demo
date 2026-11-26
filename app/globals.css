@@ -250,12 +250,15 @@ button { font-family: inherit; }
 .upl .who {
   display: flex; gap: 6px; padding: 12px 14px 0; flex: none;
 }
-.upl .who span {
+.upl .who span,
+.upl .who button {
   flex: 1; text-align: center; padding: 9px 0; border-radius: 10px;
   background: var(--chip); font-size: 11.5px; font-weight: 600; color: #5c5a55;
 }
-.upl .who span.on { background: var(--ink); color: #fff; }
+.upl .who span.on,
+.upl .who button.on { background: var(--ink); color: #fff; }
 .upl .who span.off { color: #aaa49a; }
+.upl .who button { border: 0; font: inherit; cursor: pointer; background: none; }
 .upl .drop {
   margin: 14px 14px 0; flex: none; border: 1.5px dashed #d5cfc2; border-radius: 16px;
   padding: 22px 16px; text-align: center; background: #fbf8f2;
@@ -321,7 +324,7 @@ button { font-family: inherit; }
 .cab .nums .c .v { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .cab .nums .c .k { font-size: 10px; color: var(--mut); margin-top: 2px; }
 .cab .sec { margin: 16px 16px 0; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #8d8a83; font-weight: 650; }
-.cab .ev { display: block; margin: 8px 16px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 11px; }
+.cab .ev { display: block; color: inherit; text-decoration: none; margin: 8px 16px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 11px; }
 .cab .ev .r { display: flex; gap: 11px; }
 .cab .ev .im { width: 46px; height: 58px; border-radius: 7px; background-size: cover; background-position: center; flex: none; }
 .cab .ev .t { font-size: 13px; font-weight: 650; }

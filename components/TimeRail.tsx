@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { clockOf, eventSpan, type MapEvent } from '@/lib/data';
 
 const PX_PER_HOUR = 52;
@@ -26,6 +26,9 @@ export default function TimeRail({
   onEvent?: (id: string) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  /* половина ширины ленты: столько отступа с двух сторон, чтобы любое время
+     можно было поставить под стрелку — иначе вечер 16 июля упирается в край */
+  const [pad, setPad] = useState(0);
   // Время, которое лента показывает сама. Расходится с `chosen` только когда
   // время пришло снаружи: день, точка вечера, «к нему».
   const mine = useRef(chosen);
@@ -35,15 +38,12 @@ export default function TimeRail({
   const drag = useRef<{ x: number; left: number; id: number; grabbed: boolean } | null>(null);
   const moved = useRef(false);
 
-  const center = useCallback(
-    (m: number) => (m - from) * PX_PER_MIN - (box.current?.clientWidth ?? 0) / 2,
-    [from],
-  );
+  const center = useCallback((m: number) => (m - from) * PX_PER_MIN, [from]);
 
   const read = useCallback(() => {
     const el = box.current;
     if (!el) return;
-    const m = from + (el.scrollLeft + el.clientWidth / 2) / PX_PER_MIN;
+    const m = from + el.scrollLeft / PX_PER_MIN;
     const snapped = Math.round(m / SNAP) * SNAP;
     if (Math.abs(snapped - mine.current) < SNAP) return;
     mine.current = snapped;
@@ -53,8 +53,12 @@ export default function TimeRail({
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
+    setPad(el.clientWidth / 2);
     el.scrollLeft = center(chosen);
     mine.current = chosen;
+    const ro = new ResizeObserver(() => setPad(el.clientWidth / 2));
+    ro.observe(el);
+    return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -65,12 +69,22 @@ export default function TimeRail({
     if (Math.abs(chosen - mine.current) < 1) return;
     mine.current = chosen;
     animating.current = true;
-    el.scrollTo({ left: center(chosen), behavior: 'smooth' });
+    const target = center(chosen);
+    el.scrollTo({ left: target, behavior: 'smooth' });
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
+    /* ждём, пока лента реально доедет: таймер срабатывал посреди анимации
+       и день «16 июля» вставал на 20:40 вместо 21:40 */
+    const started = Date.now();
+    const settle = () => {
+      const done = Math.abs(el.scrollLeft - target) < 2 || Date.now() - started > 1400;
+      if (!done) {
+        timer.current = setTimeout(settle, 60);
+        return;
+      }
       animating.current = false;
       read();
-    }, ANIM);
+    };
+    timer.current = setTimeout(settle, 60);
   }, [chosen, center, read]);
 
   useEffect(() => {
@@ -96,8 +110,8 @@ export default function TimeRail({
     };
   }, [read]);
 
-  const width = (to - from) * PX_PER_MIN;
-  const at = (m: number) => (m - from) * PX_PER_MIN;
+  const width = (to - from) * PX_PER_MIN + pad * 2;
+  const at = (m: number) => pad + (m - from) * PX_PER_MIN;
 
   const hours: number[] = [];
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) hours.push(m);

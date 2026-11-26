@@ -18,6 +18,7 @@ const FILES: Item[] = [
 
 export default function Uploader() {
   const [chosen, setChosen] = useState(false);
+  const [from, setFrom] = useState<'phone' | 'pc'>('phone');
   const [progress, setProgress] = useState<Record<number, number>>({});
   const [running, setRunning] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -60,16 +61,26 @@ export default function Uploader() {
       }
     >
       <div className="top">
-        <span className="rb">‹</span>
+        <Link className="rb" href="/e/7kd2qf9xm/" aria-label="Назад в вечер">
+          ‹
+        </Link>
         <span className="ttl">{running ? 'Загрузка' : done ? 'Готово' : 'Ваши кадры'}</span>
-        <span className="act">Вечер</span>
+        <Link className="act" href="/e/7kd2qf9xm/">
+          Вечер
+        </Link>
       </div>
 
       <div className="upl">
         <div className="who">
-          <span className="on">Телефон</span>
-          <span>Компьютер</span>
-          <span className="off">Облако</span>
+          <button className={from === 'phone' ? 'on' : ''} onClick={() => setFrom('phone')}>
+            Телефон
+          </button>
+          <button className={from === 'pc' ? 'on' : ''} onClick={() => setFrom('pc')}>
+            Компьютер
+          </button>
+          <span className="off" title="Появится позже">
+            Облако
+          </span>
         </div>
 
         {!chosen && (
