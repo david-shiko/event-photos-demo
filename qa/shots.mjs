@@ -86,6 +86,12 @@ await waitFor(page, () => !!document.querySelector('.sheet'), 8000, 'лист с
 await sleep(500);
 await page.screenshot({ path: `${OUT}/04-create-sheet-390.png` });
 
+/* форма вечера: настройки вместо строк-утверждений */
+await page.goto(site.url + '/new/?at=55.75289,37.63512&near=ЦСИ Винзавод', { waitUntil: 'domcontentloaded' });
+await waitFor(page, () => !!document.querySelector('.segm'), 20000, 'настройки');
+await sleep(700);
+await page.screenshot({ path: `${OUT}/06-form-390.png` });
+
 /* десктоп: карточка и карта */
 await wide.goto(site.url + '/', { waitUntil: 'domcontentloaded' });
 await pins(wide);

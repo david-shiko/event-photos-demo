@@ -249,4 +249,138 @@ export default [
       h.near(s.stack, s.pin, 1, 'стопка и пин разного размера');
     },
   },
+  {
+    name: 'карта: короткий тап не рисует кольцо удержания',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin, .lstack').length > 0, 45000, 'пины');
+      await sleep(900);
+      const spot = await wideSpot(h.page, 40);
+      h.ok(!!spot, 'на карте нет свободного места');
+      await h.page.mouse.move(spot.x, spot.y);
+      await h.page.mouse.down();
+      await sleep(120);
+      const during = await h.page.evaluate(() => !!document.querySelector('.lpress'));
+      await h.page.mouse.up();
+      await sleep(800);
+      const after = await h.page.evaluate(() => ({
+        ring: !!document.querySelector('.lpress'),
+        point: !!document.querySelector('.lring'),
+        sheet: !!document.querySelector('.sheet'),
+      }));
+      h.ok(!during, 'кольцо вспыхнуло на коротком нажатии');
+      h.ok(!after.ring && !after.point, 'после тапа осталось кольцо или точка');
+      h.ok(!after.sheet, 'короткий тап открыл лист создания');
+    },
+  },
+  {
+    name: 'карта: выбор пина не меняет его размер',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin:not(.lstack)').length > 1, 45000, 'пины');
+      await sleep(900);
+      const pin = await hitPin(h.page);
+      h.ok(!!pin, 'ни по одному пину не попасть курсором');
+      const before = await h.page.$$eval('.lpin:not(.hide) .pc', (els) => els.map((el) => Math.round(el.getBoundingClientRect().width)));
+      await h.page.mouse.click(pin.x, pin.y);
+      await h.waitFor(() => !!document.querySelector('.pincard'), 6000, 'карточка');
+      await sleep(500);
+      const after = await h.page.$$eval('.lpin:not(.hide) .pc', (els) => els.map((el) => Math.round(el.getBoundingClientRect().width)));
+      h.ok(after.length === before.length, 'при открытии карточки пины пересобрались');
+      const grew = after.filter((w, i) => w !== before[i]);
+      h.ok(grew.length === 0, `размер пина изменился при выборе: ${before.join(',')} → ${after.join(',')}`);
+    },
+  },
+  {
+    name: 'пины: целый размер без анимации размеров',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin, .lstack').length > 0, 45000, 'пины');
+      await sleep(1200);
+      const s = await h.page.evaluate(() => {
+        const box = (el) => Math.round(el.getBoundingClientRect().width);
+        const pins = [...document.querySelectorAll('.lpin:not(.hide), .lstack:not(.hide)')];
+        const circles = [...document.querySelectorAll('.lpin:not(.hide) .pc')];
+        const odd = [...pins, ...circles].filter((el) => box(el) % 2 !== 0).length;
+        const tr = pins[0] ? getComputedStyle(pins[0]).transitionProperty : '';
+        return { odd, tr, total: pins.length };
+      });
+      h.ok(s.total > 0, 'на карте нет пинов');
+      h.eq(s.odd, 0, 'пинов с нечётной шириной (полпикселя сдвига при панораме)');
+      h.ok(!/width|height/.test(s.tr), `пин анимирует размер: ${s.tr}`);
+    },
+  },
+  {
+    name: 'лист создания: адрес и координаты, под кнопкой пусто',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin, .lstack').length > 0, 45000, 'пины');
+      await sleep(900);
+      const spot = await wideSpot(h.page, 40);
+      h.ok(!!spot, 'на карте нет свободного места');
+      await h.hold(spot.x, spot.y, 800);
+      await h.waitFor(() => !!document.querySelector('.sheet'), 6000, 'лист создания');
+      const s = await h.page.evaluate(() => {
+        const sh = document.querySelector('.sheet');
+        return {
+          addr: sh?.querySelector('.addr')?.textContent?.trim() ?? '',
+          coord: sh?.querySelector('.coord')?.textContent?.trim() ?? '',
+          hints: sh?.querySelectorAll('.hint3').length ?? 0,
+          last: sh?.innerText.trim().split('\n').filter(Boolean).pop() ?? '',
+        };
+      });
+      h.ok(s.addr.length > 2, 'в листе нет адреса точки');
+      h.ok(/^\d{2}\.\d{4,6}, \d{2}\.\d{4,6}$/.test(s.coord), `координаты не в том виде: ${s.coord}`);
+      h.eq(s.hints, 0, 'под кнопкой осталась подпись');
+      h.ok(/Создать вечер здесь/.test(s.last), `под кнопкой есть текст: ${s.last}`);
+    },
+  },
+  {
+    name: 'форма вечера: назад ведёт на карту',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin, .lstack').length > 0, 45000, 'пины');
+      await sleep(900);
+      const spot = await wideSpot(h.page, 40);
+      await h.hold(spot.x, spot.y, 800);
+      await h.waitFor(() => !!document.querySelector('.sheet'), 6000, 'лист создания');
+      await h.click(h.page, '.sheet .solo');
+      await h.waitFor(() => /\/new\//.test(location.pathname), 8000, 'форма вечера');
+      await h.click(h.page, '.top .rb');
+      await sleep(900);
+      const s = await h.page.evaluate(() => ({ path: location.pathname, pins: document.querySelectorAll('.lpin, .lstack').length }));
+      h.ok(!/\/new\/|\/photographer\//.test(s.path), `назад увели не туда: ${s.path}`);
+      h.ok(s.pins > 0, 'назад привёл не на карту: пинов нет');
+    },
+  },
+  {
+    name: 'форма вечера: настройки — радиокнопки и тумблеры',
+    run: async (h) => {
+      await h.go('/new/');
+      await h.waitFor(() => !!document.querySelector('.segm'), 15000, 'настройки');
+      const s = await h.page.evaluate(() => ({
+        radios: document.querySelectorAll('.segm button[role="radio"]').length,
+        switches: document.querySelectorAll('.sw[aria-pressed]').length,
+        vis: document.querySelector('.segm button[aria-checked="true"]')?.textContent?.trim() ?? '',
+        store: [...document.querySelectorAll('.segm')]
+          .map((g) => g.querySelector('button[aria-checked="true"]')?.textContent?.trim() ?? '')[1] ?? '',
+        pressed: [...document.querySelectorAll('.sw[aria-pressed="true"]')].map((b) => b.querySelector('b')?.textContent ?? ''),
+      }));
+      h.ok(s.radios >= 5, `радиокнопок ${s.radios}, ждали два выбора по два-три варианта`);
+      h.ok(s.switches >= 4, `тумблеров ${s.switches}, ждали четыре`);
+      h.eq(s.vis, 'Только по ссылке', 'видимость вечера по умолчанию');
+      h.eq(s.store, '90 дней', 'хранение по умолчанию');
+      h.ok(/Вход по коду/.test(s.pressed.join('|')) === false, 'вход по коду включён по умолчанию');
+
+      /* выбор доезжает до оплаты: цифры на шаге 2 те же */
+      await h.click(h.page, '.segm button', 1);
+      await h.click(h.page, '.segm button', 3);
+      await sleep(300);
+      await h.click(h.page, '.cta');
+      await h.waitFor(() => /Оплатить/.test(document.body.innerText), 8000, 'шаг 2');
+      const pay = await h.page.evaluate(() => document.querySelector('.sheet, .nv')?.innerText ?? document.body.innerText);
+      h.ok(/1 год/.test(pay), 'выбранное хранение не доехало до оплаты');
+      h.ok(/на карте города/.test(pay), 'выбранная видимость не доехала до оплаты');
+    },
+  },
 ];

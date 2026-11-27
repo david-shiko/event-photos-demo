@@ -58,7 +58,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.25s, width 0.15s, height 0.15s;
+  transition: opacity 0.2s;
   -webkit-touch-callout: none;
   user-select: none;
 }
@@ -84,7 +84,7 @@
   justify-content: center;
   color: #fff;
   font-size: 15px;
-  transition: width 0.15s, height 0.15s, border-color 0.15s;
+  transition: border-color 0.15s;
 }
 
 .lpin b {
@@ -117,7 +117,7 @@
   transition: opacity 0.15s;
 }
 
-.lpin.on .pc { width: calc(var(--pin, 52px) + 8px); height: calc(var(--pin, 52px) + 8px); border-color: var(--ink); }
+.lpin.on .pc { border-color: var(--ink); }
 .lpin.on .nm { opacity: 1; }
 .lpin.on { z-index: 500; }
 
@@ -194,6 +194,11 @@
 
 
 
+@keyframes pc-in {
+  from { opacity: 0; transform: translateX(calc(-50% + var(--shift, 0px))) translateY(4px); }
+  to { opacity: 1; transform: translateX(calc(-50% + var(--shift, 0px))) translateY(0); }
+}
+
 /* карточка живёт в слое маркеров: точку ставит карта, руками не переставляем */
 .pincard-host {
   position: absolute;
@@ -215,6 +220,7 @@
   padding: 11px 12px 12px;
   /* --shift держит карточку в экране, когда пин прижат к краю */
   transform: translateX(calc(-50% + var(--shift, 0px)));
+  animation: pc-in 0.14s ease-out both;
   display: block;
   color: var(--ink);
   text-decoration: none;

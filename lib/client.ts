@@ -10,6 +10,8 @@ export type Created = {
   venue: string;
   when: string;
   cover?: string;
+  /** вечер виден на карте города: выбор из формы, по умолчанию только по ссылке */
+  onMap?: boolean;
   /** точка создания: вечер встаёт на карту ровно туда, где держали палец */
   lat?: number;
   lng?: number;

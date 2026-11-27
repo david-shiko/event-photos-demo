@@ -566,6 +566,33 @@ export type Ev = {
 /** Доля гостевых кадров: остальное снял фотограф. */
 export const guestsOf = (n: number) => n - Math.round((n * 4) / 7);
 
+/* Ориентиры центра: демо-геокодер. Нужен, чтобы лист «Новый вечер здесь» называл
+   адрес точки, а не «вокруг никого». Настоящий геокодер — одна строка в API-слое. */
+const PLACES: { name: string; addr: string; lat: number; lng: number }[] = [
+  { name: 'Лофт «Красный Октябрь»', addr: 'Берсеневская наб., 6', lat: 55.7394, lng: 37.6078 },
+  { name: 'ЦСИ Винзавод', addr: 'Нижняя Сыромятническая ул., 10', lat: 55.7553, lng: 37.6642 },
+  { name: 'Бар «Соль»', addr: 'ул. Солянка, 9', lat: 55.7529, lng: 37.6377 },
+  { name: 'Парк Горького', addr: 'Крымский Вал, 9', lat: 55.7311, lng: 37.6019 },
+  { name: 'Зарядье', addr: 'ул. Варварка, 6', lat: 55.751, lng: 37.629 },
+  { name: 'ГЭС-2', addr: 'Болотная наб., 15', lat: 55.7402, lng: 37.6127 },
+  { name: 'Дом на Арбате', addr: 'ул. Арбат, 24', lat: 55.7498, lng: 37.5921 },
+  { name: 'Патриаршие', addr: 'Малая Бронная ул., 4', lat: 55.7634, lng: 37.5922 },
+];
+
+/** Ближайший известный адрес к точке: «что здесь» для листа создания. */
+export function placeOf(p: { lat: number; lng: number }) {
+  const M = 111_320;
+  let best: { name: string; addr: string; lat: number; lng: number; m: number } | null = null;
+  for (const pl of PLACES) {
+    const dx = (p.lng - pl.lng) * M * Math.cos((p.lat * Math.PI) / 180);
+    const dy = (p.lat - pl.lat) * 110_540;
+    const m = Math.round(Math.hypot(dx, dy));
+    if (!best || m < best.m) best = { ...pl, m };
+  }
+  return best && best.m <= 1200 ? best : null;
+}
+
+
 /** Данные вечера по id: счётчики, куски вечера и кадры под них. Черновик кадров не выдумывает. */
 export function eventFor(id: string): Ev {
   const m = mapEvents.find((e) => e.id === id) ?? mapEvents[0];

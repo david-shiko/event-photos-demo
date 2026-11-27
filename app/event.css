@@ -323,6 +323,9 @@
   margin-bottom: -8px;
 }
 .sheet .hint3.left { text-align: left; margin-top: 6px; }
+/* адрес точки создания: что здесь и где именно */
+.sheet .addr { font-size: 12.5px; color: #3f3d38; margin-top: 8px; text-align: center; }
+.sheet .coord { font-size: 11px; color: var(--mut); margin-top: 3px; font-variant-numeric: tabular-nums; }
 
 /* ---------- вечер без кадров ---------- */
 .pre { flex: 1; overflow-y: auto; background: var(--panel); padding: 18px 16px 26px; }

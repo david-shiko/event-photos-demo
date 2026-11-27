@@ -29,10 +29,13 @@ const CENTER: [number, number] = [37.628, 55.7505];
 const STACK_MIN = 2;
 /* держим 600 мс: короче — срабатывает при панораме, длиннее — палец устаёт */
 const HOLD = 600;
+/* кольцо появляется через 160 мс: на короткий тап его не видно вовсе */
+const SHOW_RING = 160;
 const SLOP = 10;
 /* пин растёт с зумом: на общем плане города он 48, на близком — 78.
    Верхняя граница — «в два раза крупнее прежних 38» (design.md §3.3). */
-const PIN = (zoom: number) => Math.round(Math.max(48, Math.min(78, 48 + (zoom - 11) * 7.2)));
+const PIN = (zoom: number) =>
+  2 * Math.round(Math.max(48, Math.min(78, 48 + (zoom - 11) * 7.2)) / 2);
 /* под пальцем кнопка, пин или карточка — это уже не «пустое место» */
 const BUSY = 'a, button, .maplibregl-ctrl, .maplibregl-marker';
 
@@ -225,11 +228,13 @@ export default function LiveMap({
       next.forEach((g) => {
         const key = g.items.map((i) => i.id).sort().join('+');
         const stack = g.items.length >= STACK_MIN;
-        const lead = g.items.find((i) => i.id === activeId) ?? g.items[0];
+        const lead = g.items[0];
         let marker = pins.current.get(key);
         if (!marker) {
           const el = document.createElement('button');
           el.type = 'button';
+          /* какие вечера в этой метке: по ним включается выделение без пересборки */
+          el.dataset.ids = key;
           el.className = stack ? 'lstack' : `lpin ${lead.soon ? 'soon' : ''} ${lead.locked ? 'lock' : ''}`;
           if (stack) {
             const venues = new Set(g.items.map((i) => i.venue));
@@ -251,7 +256,6 @@ export default function LiveMap({
         }
         const el = marker.getElement();
         el.style.setProperty('--pin', `${PIN(m.getZoom())}px`);
-        el.classList.toggle('on', g.items.some((i) => i.id === activeId));
         el.classList.toggle('dim', g.items.every((i) => dim.includes(i.id)));
       });
     };
@@ -279,8 +283,18 @@ export default function LiveMap({
       window.removeEventListener('lmap-ready', onReady);
       if (hooked) map.current?.off('zoomend', onZoom);
     };
-  }, [events, activeId, dim]);
+  }, [events, dim]);
 
+
+  /* выбранный пин: только класс на уже нарисованных маркерах.
+     Пересобирать стопки из-за одного выделения незачем — это и был лишний ререндер. */
+  useEffect(() => {
+    pins.current.forEach((marker) => {
+      const el = marker.getElement();
+      const on = activeId ? el.dataset.ids?.split('+').includes(activeId) : false;
+      el.classList.toggle('on', !!on);
+    });
+  }, [activeId, open, events]);
 
   /* карточка — маркер карты: её двигает та же трансформация, что и пин,
      иначе она отстаёт от пина на кадр и «плывёт» при панораме.
@@ -381,7 +395,7 @@ export default function LiveMap({
     const m = map.current;
     if (!m || !e || !ready.current) return;
     const p = m.project([e.lng, e.lat]);
-    const pad = 140;
+    const pad = 100;
     const out = p.x < pad || p.y < 120 || p.x > m.getCanvas().clientWidth - pad || p.y > 420;
     if (out) m.easeTo({ center: [e.lng, e.lat], duration: 450 });
   }, [activeId, events]);
@@ -394,6 +408,7 @@ export default function LiveMap({
     if (!m || !el || !loaded) return;
 
     let timer = 0;
+    let ringTimer = 0;
     let from: { id: number; x: number; y: number } | null = null;
     let fired = 0;
     /* пальцы на экране: второй — это уже пинч, удержание уступает */
@@ -401,7 +416,9 @@ export default function LiveMap({
 
     const stop = () => {
       if (timer) window.clearTimeout(timer);
+      if (ringTimer) window.clearTimeout(ringTimer);
       timer = 0;
+      ringTimer = 0;
       from = null;
       setPress(null);
     };
@@ -414,11 +431,13 @@ export default function LiveMap({
         return;
       }
       if ((e.target as Element | null)?.closest(BUSY)) return;
-      if (timer) window.clearTimeout(timer);
+      stop();
       const id = e.pointerId;
       from = { id, x: e.clientX, y: e.clientY };
       const r0 = el.getBoundingClientRect();
-      setPress({ x: e.clientX - r0.left, y: e.clientY - r0.top });
+      /* кольцо показываем только когда нажатие уже похоже на удержание:
+         на короткий тап не должно быть ни точки, ни вспышки */
+      ringTimer = window.setTimeout(() => setPress({ x: e.clientX - r0.left, y: e.clientY - r0.top }), SHOW_RING);
       timer = window.setTimeout(() => {
         timer = 0;
         /* таймер, переживший свой палец, не должен ничего создавать */
@@ -499,7 +518,13 @@ export default function LiveMap({
       {!loaded && <span className="lmap-load">карта загружается…</span>}
 
       {/* кольцо растёт, пока держишь: видно, что жест поймался и где встанет вечер */}
-      {press && <span key={`${press.x}-${press.y}`} className="lpress" style={{ left: press.x, top: press.y }} />}
+      {press && (
+        <span
+          key={`${press.x}-${press.y}`}
+          className="lpress"
+          style={{ left: press.x, top: press.y, animationDuration: `${HOLD - SHOW_RING}ms` }}
+        />
+      )}
       {ring && <span className="lring" style={{ left: ring.x, top: ring.y }} />}
 
       {/* карточка целиком — ссылка: второй тап по ней уже открывает вечер,
@@ -508,6 +533,7 @@ export default function LiveMap({
         cardHost &&
         createPortal(
           <Link
+            key={active.id}
             className={`pincard ${below ? 'below' : ''}`}
             href={active.href ?? `/e/${active.id}/`}
             aria-label={`Открыть ${active.title}`}

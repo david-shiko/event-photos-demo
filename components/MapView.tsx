@@ -7,7 +7,7 @@ import LiveMap, { type Blank } from './LiveMap';
 import Sheet from './Sheet';
 import DayStrip from './DayStrip';
 import TimeRail from './TimeRail';
-import { asset, clockOf, DAYS, eventSpan, frames, mapEvents, plural, sources, type MapEvent } from '@/lib/data';
+import { asset, clockOf, DAYS, eventSpan, frames, mapEvents, placeOf, plural, sources, type MapEvent } from '@/lib/data';
 import { readCreated, type Created } from '@/lib/client';
 
 const NOW = 1440 + 21 * 60 + 40; // 11 июля, 21:40 — «сейчас» в демо
@@ -17,13 +17,6 @@ const DIM = 30; // минут до начала, когда пин бледне�
 const TAIL = 30; // минут после конца, когда пин ещё виден
 
 const onMap = mapEvents.filter((e) => !e.hidden);
-
-/* метры между точками: «рядом с этим вечером» — не «в этом вечере» */
-const meters = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
-  const dx = (a.lng - b.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180);
-  const dy = (a.lat - b.lat) * 110_540;
-  return Math.round(Math.hypot(dx, dy));
-};
 
 export default function MapView() {
   const router = useRouter();
@@ -41,6 +34,7 @@ export default function MapView() {
     () => [
       ...onMap,
       ...created
+        .filter((c) => c.onMap !== false)
         .filter((c) => typeof c.lat === 'number' && typeof c.lng === 'number')
         .filter((c) => !onMap.some((e) => e.id === c.id))
         .map((c) => ({
@@ -64,11 +58,14 @@ export default function MapView() {
   const day = Math.max(0, Math.min(6, clock.day));
   const dayEvents = all.filter((e) => e.when.split(', ')[0] === DAYS[day].label);
 
-  const spans = all.map((e) => ({ e, ...eventSpan(e) }));
-  const shown = spans
-    .filter((s) => chosen >= s.start - DIM && chosen <= s.end + TAIL)
-    .map((s) => s.e);
-  const dim = spans.filter((s) => s.start > chosen).map((s) => s.e.id);
+  /* списки для карты держим стабильными: новый массив на каждый рендер заставлял
+     карту пересобирать стопки, а маркеры — переставляться */
+  const spans = useMemo(() => all.map((e) => ({ e, ...eventSpan(e) })), [all]);
+  const shown = useMemo(
+    () => spans.filter((s) => chosen >= s.start - DIM && chosen <= s.end + TAIL).map((s) => s.e),
+    [spans, chosen],
+  );
+  const dim = useMemo(() => spans.filter((s) => s.start > chosen).map((s) => s.e.id), [spans, chosen]);
 
   const next = spans
     .filter((s) => s.start > chosen)
@@ -101,18 +98,14 @@ export default function MapView() {
     setBlank(null);
   };
 
-  /* рядом — только чтобы написать «зал тот же, вечер ваш»: сам вечер встаёт в точку пальца */
-  const near = blank
-    ? all
-        .map((e) => ({ e, d: meters(blank, e) }))
-        .sort((a, b) => a.d - b.d)[0] ?? null
-    : null;
+  /* адрес точки: ближайший ориентир, иначе просто город — координаты рядом */
+  const place = blank ? placeOf(blank) : null;
 
   const createHere = () => {
     if (!blank) return;
     const q = new URLSearchParams({
       at: `${blank.lat.toFixed(5)},${blank.lng.toFixed(5)}`,
-      near: near && near.d < 400 ? near.e.venue : '',
+      near: place?.name ?? '',
       day: DAYS[day].label,
     });
     router.push(`/new/?${q.toString()}`);
@@ -202,15 +195,13 @@ export default function MapView() {
       {blank && (
         <Sheet onClose={() => setBlank(null)} closeLabel="Отмена">
           <div className="st">Новый вечер здесь</div>
-          <div className="hint3 left">
-            {near && near.d < 400
-              ? `Зал тот же — «${near.e.venue}», ${near.d} м. Но вечер будет ваш: чужие кадры сюда не попадут.`
-              : 'Вокруг никого. Вечер встанет ровно в эту точку и появится на карте со своей афишей.'}
+          <div className="addr">{place ? `${place.name} · ${place.addr}` : 'Москва'}</div>
+          <div className="coord">
+            {blank.lat.toFixed(5)}, {blank.lng.toFixed(5)}
           </div>
           <button className="primary solo" onClick={createHere}>
             Создать вечер здесь
           </button>
-          <div className="hint3">Дальше — название, дата и 690 ₽. Ссылка и QR появятся сразу после оплаты.</div>
         </Sheet>
       )}
 

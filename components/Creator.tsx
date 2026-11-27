@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Shell from './Shell';
 import { asset } from '@/lib/data';
@@ -9,13 +10,23 @@ import { saveCreated, useCopy } from '@/lib/client';
 const LINK = 'event.photos/s/mk7f2q';
 const PRICE = 690;
 const DOW = ['четверг', 'пятница', 'суббота', 'воскресенье', 'понедельник', 'вторник', 'среда'];
+const STORE = { '90': '90 дней', '365': '1 год', inf: 'бессрочно' } as const;
+type Store = keyof typeof STORE;
 
 type Field = 'title' | 'venue' | 'date' | 'time';
 
 export default function Creator() {
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [paying, setPaying] = useState(false);
+  /* настройки вечера: то, что раньше было строчками-утверждениями */
   const [guests, setGuests] = useState(true);
+  const [video, setVideo] = useState(true);
+  const [originals, setOriginals] = useState(true);
+  const [code, setCode] = useState(false);
+  /* по умолчанию вечер живёт по ссылке: карта — выбор, а не данность */
+  const [vis, setVis] = useState<'link' | 'map'>('link');
+  const [store, setStore] = useState<Store>('90');
   const [card, setCard] = useState<'sbp' | 'card'>('sbp');
   const [f, setF] = useState<Record<Field, string>>({
     title: 'Свадьба Маши и Кости',
@@ -60,6 +71,7 @@ export default function Creator() {
         when: f.date,
         cover: '/img/p4.jpg',
         window: f.time,
+        onMap: vis === 'map',
         ...(at ?? {}),
       });
       setPaying(false);
@@ -94,9 +106,9 @@ export default function Creator() {
     >
       <div className="top">
         {step === 1 ? (
-          <Link className="rb" href="/photographer/">
+          <button className="rb" onClick={() => router.back()} aria-label="Назад">
             ‹
-          </Link>
+          </button>
         ) : step === 2 ? (
           <button className="rb" onClick={() => !paying && setStep(1)}>
             ‹
@@ -154,6 +166,28 @@ export default function Creator() {
                 </div>
               </div>
 
+              <div className="grp" role="radiogroup" aria-label="Кто видит вечер">
+                <div className="flb">Кто видит вечер</div>
+                <div className="segm">
+                  <button
+                    role="radio"
+                    aria-checked={vis === 'link'}
+                    className={vis === 'link' ? 'on' : ''}
+                    onClick={() => setVis('link')}
+                  >
+                    Только по ссылке
+                  </button>
+                  <button
+                    role="radio"
+                    aria-checked={vis === 'map'}
+                    className={vis === 'map' ? 'on' : ''}
+                    onClick={() => setVis('map')}
+                  >
+                    И на карте города
+                  </button>
+                </div>
+              </div>
+
               <button className="sw" onClick={() => setGuests(!guests)} aria-pressed={guests}>
                 <span className={`tg ${guests ? 'on' : ''}`}>
                   <i />
@@ -164,22 +198,50 @@ export default function Creator() {
                 </span>
               </button>
 
-              <div className="tips">
-                <div className="tr">
-                  <span>Ссылка и QR</span>
-                  <b>сразу после оплаты</b>
-                </div>
-                <div className="tr">
-                  <span>Хранение</span>
-                  <b>90 дней</b>
-                </div>
-                <div className="tr">
-                  <span>Место</span>
-                  <b>до 40 ГБ</b>
-                </div>
-                <div className="tr">
-                  <span>Вечер на карте</span>
-                  <b>{guests ? 'да, с кадрами и видео' : 'только по ссылке'}</b>
+              <button className="sw" onClick={() => setVideo(!video)} aria-pressed={video}>
+                <span className={`tg ${video ? 'on' : ''}`}>
+                  <i />
+                </span>
+                <span className="tx">
+                  <b>Видео от гостей</b>
+                  <span>до 2 минут на файл</span>
+                </span>
+              </button>
+
+              <button className="sw" onClick={() => setOriginals(!originals)} aria-pressed={originals}>
+                <span className={`tg ${originals ? 'on' : ''}`}>
+                  <i />
+                </span>
+                <span className="tx">
+                  <b>Гости скачивают оригиналы</b>
+                  <span>без вотермарки и без доплаты</span>
+                </span>
+              </button>
+
+              <button className="sw" onClick={() => setCode(!code)} aria-pressed={code}>
+                <span className={`tg ${code ? 'on' : ''}`}>
+                  <i />
+                </span>
+                <span className="tx">
+                  <b>Вход по коду</b>
+                  <span>ссылка просит четыре цифры с карточки</span>
+                </span>
+              </button>
+
+              <div className="grp" role="radiogroup" aria-label="Хранение">
+                <div className="flb">Сколько храним</div>
+                <div className="segm">
+                  {(['90', '365', 'inf'] as Store[]).map((k) => (
+                    <button
+                      key={k}
+                      role="radio"
+                      aria-checked={store === k}
+                      className={store === k ? 'on' : ''}
+                      onClick={() => setStore(k)}
+                    >
+                      {STORE[k]}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -228,7 +290,11 @@ export default function Creator() {
               <div className="tips" style={{ marginTop: 16 }}>
                 <div className="tr">
                   <span>Хранение</span>
-                  <b>90 дней</b>
+                  <b>{STORE[store]}</b>
+                </div>
+                <div className="tr">
+                  <span>Кто видит</span>
+                  <b>{vis === 'map' ? 'на карте города' : 'только по ссылке'}</b>
                 </div>
                 <div className="tr">
                   <span>Место</span>
@@ -236,7 +302,7 @@ export default function Creator() {
                 </div>
                 <div className="tr">
                   <span>Видео</span>
-                  <b>1080p, до 2 минут</b>
+                  <b>{video ? '1080p, до 2 минут' : 'выключено'}</b>
                 </div>
                 <div className="tr">
                   <span>Гости</span>
@@ -318,7 +384,7 @@ export default function Creator() {
               <Link className="cta" href="/e/demo/?id=mk7f2q">
                 Открыть вечер
               </Link>
-              {at && (
+              {at && vis === 'map' && (
                 <Link className="ghost2" style={{ marginTop: 8 }} href="/?pin=mk7f2q">
                   Показать на карте
                 </Link>

@@ -44,6 +44,15 @@ export default function Sheet({ onClose, className = '', closeLabel = 'Закр�
     const move = (e: PointerEvent) => {
       if (id !== e.pointerId) return;
       dy = Math.max(0, e.clientY - y0);
+      /* захват включаем только когда поехали: иначе браузер отдаёт click листу,
+         и кнопка внутри листа перестаёт нажиматься */
+      if (dy > 6 && !sheet.hasPointerCapture(e.pointerId)) {
+        try {
+          sheet.setPointerCapture(e.pointerId);
+        } catch {
+          /* синтетический указатель — обойдёмся без захвата */
+        }
+      }
       sheet.style.transition = 'none';
       sheet.style.transform = dy ? `translateY(${dy}px)` : '';
     };
@@ -51,6 +60,11 @@ export default function Sheet({ onClose, className = '', closeLabel = 'Закр�
     const up = (e: PointerEvent) => {
       if (id !== e.pointerId) return;
       id = null;
+      try {
+        sheet.releasePointerCapture(e.pointerId);
+      } catch {
+        /* уже отпущен */
+      }
       end(dy <= CLOSE_AFTER);
     };
 

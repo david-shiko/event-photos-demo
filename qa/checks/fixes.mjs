@@ -237,6 +237,9 @@ export default [
       h.ok(/at=/.test(s.url), `точка не передалась в создание: ${s.url}`);
       h.ok(/точка с карты/.test(s.text), 'в форме нет отметки, откуда точка');
 
+      /* по умолчанию вечер живёт по ссылке: чтобы он встал на карту, выбираем это руками */
+      await h.click(h.page, '.segm button', 1);
+      await h.sleep(300);
       await h.click(h.page, '.cta');
       await h.waitFor(() => /Оплатить/.test(document.body.innerText), 8000, 'шаг 2');
       await h.click(h.page, '.cta');

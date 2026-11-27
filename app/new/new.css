@@ -6,7 +6,7 @@
   flex-direction: column;
 }
 
-.nv .pad { padding: 2px 16px 0; overflow: hidden; flex: 1; }
+.nv .pad { padding: 2px 16px 18px; overflow-y: auto; flex: 1; }
 
 .nv .fh { font-size: 10.5px; color: var(--mut); margin-top: 4px; }
 
@@ -76,6 +76,30 @@
 .nv .sw .tx { display: flex; flex-direction: column; gap: 2px; }
 .nv .sw .tx b { font-size: 12px; font-weight: 650; }
 .nv .sw .tx span { font-size: 10.5px; color: var(--mut); }
+
+/* группа настроек: подпись и варианты выбора */
+.nv .grp { margin-top: 16px; }
+.nv .segm { display: flex; gap: 6px; margin-top: 7px; }
+.nv .segm button {
+  flex: 1;
+  height: 40px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #4a4742;
+  cursor: pointer;
+}
+.nv .segm button.on {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+  color: var(--ink);
+  font-weight: 650;
+}
+.nv .sw + .sw { margin-top: 8px; }
 
 .nv .tips { margin-top: 16px; border-top: 1px solid var(--soft); }
 .nv .tr {
