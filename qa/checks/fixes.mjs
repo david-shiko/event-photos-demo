@@ -220,9 +220,10 @@ export default [
       h.ok(!!spot, 'не нашёл пустого места на карте');
       await h.page.mouse.move(spot.x, spot.y);
       await h.page.mouse.down();
-      await h.sleep(300);
+      /* кольцо появляется через 160 мс после нажатия: на медленном раннере ждём с запасом */
+      await h.sleep(450);
       const hold = await h.page.evaluate(() => !!document.querySelector('.lpress'));
-      await h.sleep(500);
+      await h.sleep(400);
       await h.page.mouse.up();
       await h.sleep(500);
       h.ok(hold, 'кольцо удержания не появилось — жест не видно');
