@@ -132,12 +132,18 @@ export const makePhotos = (buckets: Bucket[], from: number): Photo[] => {
   return out;
 };
 
-/* куски по два часа: чипс и лента считаются из одного и того же поля period */
-const periodsFor = (photos: Photo[], from: number, to: number): Period[] => {
+/* куски по два часа: чипс и лента считаются из одного и того же поля period.
+   source сужает счётчик: под «фотограф» чипс обязан показывать 19, а не 32. */
+export const periodsOf = (
+  photos: Photo[],
+  from: number,
+  to: number,
+  source?: 'photo' | 'guest',
+): Period[] => {
   const out: Period[] = [];
   for (let i = 0; from + i * 120 < to; i += 1) {
     const id = `p${i}`;
-    const count = photos.filter((p) => p.period === id).length;
+    const count = photos.filter((p) => p.period === id && (!source || p.source === source)).length;
     if (!count) continue;
     out.push({ id, label: `${fmt(from + i * 120)}–${fmt(Math.min(from + (i + 1) * 120, to))}`, count, from: from + i * 120, to: Math.min(from + (i + 1) * 120, to) });
   }
@@ -161,6 +167,8 @@ export type MapEvent = {
   by?: string;
   /** есть страница, но на карте и в ленте его нет */
   hidden?: boolean;
+  /** свой адрес страницы: у созданного в демо вечера он /e/demo/?id=… */
+  href?: string;
 };
 
 export const mapEvents: MapEvent[] = [
@@ -546,7 +554,9 @@ export type Ev = {
   sources: number;
   cover: string;
   city: string;
-  wasThere: string;
+  /** время гостя на вечере: только если он сам залил кадр (EXIF). Иначе undefined —
+      «вы были в 21:40» из воздуха было бы выдумкой. */
+  wasThere?: string;
   photos: Photo[];
   periods: Period[];
   /** опубликован — ссылка показывает кадры; draft — кадров ещё нет, отдаём «готовится» */
@@ -574,9 +584,8 @@ export function eventFor(id: string): Ev {
     sources: m.sources,
     cover: m.id === '7kd2qf9xm' ? asset('/img/big.jpg') : m.img,
     city: 'Москва',
-    wasThere: '21:40',
     photos,
-    periods: photos.length ? periodsFor(photos, from, to) : [],
+    periods: photos.length ? periodsOf(photos, from, to) : [],
     state: n > 0 ? 'published' : 'draft',
   };
 }

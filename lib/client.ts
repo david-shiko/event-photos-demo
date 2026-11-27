@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-/** Вечер, созданный в демо: живёт в localStorage, чтобы кабинет его увидел. */
+/** Вечер, созданный в демо: живёт в localStorage, чтобы кабинет и карта его увидели. */
 export type Created = {
   id: string;
   code: string;
@@ -10,6 +10,11 @@ export type Created = {
   venue: string;
   when: string;
   cover?: string;
+  /** точка создания: вечер встаёт на карту ровно туда, где держали палец */
+  lat?: number;
+  lng?: number;
+  /** окно вечера «19:00–02:00» — без него пину нечего показывать на ленте */
+  window?: string;
 };
 
 const KEY = 'ep.created';
@@ -35,8 +40,32 @@ export function saveCreated(ev: Created) {
   }
 }
 
-async function write(text: string) {
+/** Время гостя на вечере. Появляется, когда гость сам залил кадр: EXIF знает время съёмки.
+ *  Без загрузки время брать неоткуда — «вы были в 21:40» иначе выдумка. */
+const WAS = 'ep.wasThere';
+
+export function markUploaded(eventId: string, time: string) {
+  if (typeof window === 'undefined') return;
   try {
+    const all = JSON.parse(window.localStorage.getItem(WAS) ?? '{}') as Record<string, string>;
+    all[eventId] = time;
+    window.localStorage.setItem(WAS, JSON.stringify(all));
+  } catch {
+    /* приватный режим — гость просто не увидит «найти себя» */
+  }
+}
+
+export function readUploaded(eventId: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const all = JSON.parse(window.localStorage.getItem(WAS) ?? '{}') as Record<string, string>;
+    return all[eventId] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function write(text: string) {  try {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {

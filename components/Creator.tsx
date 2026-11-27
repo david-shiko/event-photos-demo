@@ -8,6 +8,7 @@ import { saveCreated, useCopy } from '@/lib/client';
 
 const LINK = 'event.photos/s/mk7f2q';
 const PRICE = 690;
+const DOW = ['четверг', 'пятница', 'суббота', 'воскресенье', 'понедельник', 'вторник', 'среда'];
 
 type Field = 'title' | 'venue' | 'date' | 'time';
 
@@ -24,6 +25,22 @@ export default function Creator() {
   });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { done, copy } = useCopy();
+  /* точка с карты: держали палец там — вечер встанет туда же */
+  const [at, setAt] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const raw = q.get('at') ?? '';
+    const [lat, lng] = raw.split(',').map(Number);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) setAt({ lat, lng });
+    const near = q.get('near');
+    const day = q.get('day');
+    setF((prev) => ({
+      ...prev,
+      venue: near && near.trim() ? near : prev.venue,
+      date: day ? `${day}, ${DOW[Math.max(0, ['10 июля', '11 июля', '12 июля', '13 июля', '14 июля', '15 июля', '16 июля'].indexOf(day))]}` : prev.date,
+    }));
+  }, []);
 
   useEffect(
     () => () => {
@@ -35,7 +52,16 @@ export default function Creator() {
   const pay = () => {
     setPaying(true);
     timer.current = setTimeout(() => {
-      saveCreated({ id: 'mk7f2q', code: '6391', title: f.title, venue: f.venue, when: f.date, cover: '/img/p4.jpg' });
+      saveCreated({
+        id: 'mk7f2q',
+        code: '6391',
+        title: f.title,
+        venue: f.venue,
+        when: f.date,
+        cover: '/img/p4.jpg',
+        window: f.time,
+        ...(at ?? {}),
+      });
       setPaying(false);
       setStep(3);
     }, 1500);
@@ -103,6 +129,11 @@ export default function Creator() {
                   onChange={(e) => setF({ ...f, venue: e.target.value })}
                   aria-label="Площадка"
                 />
+                {at && (
+                  <div className="fh">
+                    точка с карты · {at.lat.toFixed(4)}, {at.lng.toFixed(4)}
+                  </div>
+                )}
               </div>
               <div className="two">
                 <div className="fld">
@@ -287,6 +318,11 @@ export default function Creator() {
               <Link className="cta" href="/e/demo/?id=mk7f2q">
                 Открыть вечер
               </Link>
+              {at && (
+                <Link className="ghost2" style={{ marginTop: 8 }} href="/?pin=mk7f2q">
+                  Показать на карте
+                </Link>
+              )}
               <Link className="ghost2" style={{ marginTop: 8 }} href="/photographer/">
                 В кабинет
               </Link>

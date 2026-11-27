@@ -8,7 +8,9 @@
 
 .nv .pad { padding: 2px 16px 0; overflow: hidden; flex: 1; }
 
-.nv .flb {
+.nv .fh { font-size: 10.5px; color: var(--mut); margin-top: 4px; }
+
+.flb {
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import Shell from './Shell';
 import { asset } from '@/lib/data';
+import { markUploaded } from '@/lib/client';
 
 type Item = { id: number; name: string; size: string; img: string; video?: boolean };
 
@@ -46,6 +47,8 @@ export default function Uploader() {
 
   useEffect(() => {
     if (done && running) setRunning(false);
+    /* гость залил кадр — теперь мы знаем время съёмки и можем показать «найти себя» */
+    if (done) markUploaded('7kd2qf9xm', '21:40');
   }, [done, running]);
 
   return (

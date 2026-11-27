@@ -6,21 +6,34 @@ import Supercluster from 'supercluster';
 import { useEffect, useRef, useState } from 'react';
 import { asset, plural, type MapEvent } from '@/lib/data';
 
+export type Blank = { lat: number; lng: number };
+
 type Props = {
   events: MapEvent[];
   dim?: string[];
   activeId: string | null;
   open: boolean;
+  /** точка, где держали палец: на ней же встанет новый вечер */
+  blank: Blank | null;
   onPick: (id: string) => void;
   onCollapse: () => void;
   onCluster: (items: MapEvent[]) => void;
+  onBlank: (point: Blank) => void;
 };
 
 const STYLE = 'https://tiles.openfreemap.org/styles/positron';
 const CENTER: [number, number] = [37.628, 55.7505];
-/* пять и больше вечеров в одном адресе — стопка (design.md §3.5) */
-const STACK_MIN = 5;
+/* два и больше вечера в одном пятне — стопка (design.md §3.5).
+   Одиночный пин из кластера прятал соседей: их не было видно и некуда нажать. */
+const STACK_MIN = 2;
 const CARD_W = 252;
+/* держим 600 мс: короче — срабатывает при панораме, длиннее — палец устаёт */
+const HOLD = 600;
+const SLOP = 10;
+/* пин растёт с зумом: на общем плане города он 48, на близком — 78.
+   Верхняя граница — «в два раза крупнее прежних 38» (design.md §3.3). */
+const PIN = (zoom: number) => Math.round(Math.max(48, Math.min(78, 48 + (zoom - 11) * 7.2)));
+const NEAR = 14.2;
 
 type Group = { items: MapEvent[]; lat: number; lng: number };
 type Card = { x: number; y: number; below: boolean };
@@ -31,15 +44,29 @@ const spread = (items: MapEvent[]): Group => ({
   lng: items.reduce((s, e) => s + e.lng, 0) / items.length,
 });
 
-export default function LiveMap({ events, dim = [], activeId, open, onPick, onCollapse, onCluster }: Props) {
+export default function LiveMap({
+  events,
+  dim = [],
+  activeId,
+  open,
+  blank,
+  onPick,
+  onCollapse,
+  onCluster,
+  onBlank,
+}: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<import('maplibre-gl').Map | null>(null);
   const pins = useRef<Map<string, import('maplibre-gl').Marker>>(new Map());
   const groups = useRef<Group[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [card, setCard] = useState<Card | null>(null);
+  /* кольцо под пальцем, пока идёт удержание */
+  const [press, setPress] = useState<{ x: number; y: number } | null>(null);
+  const [ring, setRing] = useState<{ x: number; y: number } | null>(null);
   const pick = useRef(onPick);
   const cluster = useRef(onCluster);
+  const blankFn = useRef(onBlank);
   const ready = useRef(false);
   const initial = useRef(events);
   const observer = useRef<ResizeObserver | null>(null);
@@ -47,6 +74,7 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
   const startZoom = useRef(13);
   pick.current = onPick;
   cluster.current = onCluster;
+  blankFn.current = onBlank;
 
   useEffect(() => {
     let dead = false;
@@ -98,6 +126,7 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           /* охват считаем по размеру полотна: fitBounds до первого resize врёт */
           const cam = m.cameraForBounds(b, { padding: 0 });
           if (cam?.center) {
+            /* пины крупные: на общем плане города они слипаются, поэтому стартуем ближе */
             startZoom.current = Math.min((cam.zoom ?? 13) + 0.85, 13.4);
             m.jumpTo({ center: cam.center, zoom: startZoom.current });
           }
@@ -140,8 +169,9 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
 
       /* группировку считает supercluster — тот движок, что MapLibre держит внутри.
          Свой обход пикселей умел залипать: стопка не раскрывалась при зуме. */
+      /* радиус стопки чуть больше пина: соседи не перекрывают друг друга, а кучкуются */
       const index = new Supercluster<{ ids: string[] }, { ids: string[] }>({
-        radius: 26,
+        radius: Math.max(34, PIN(m.getZoom()) / 2 + 14),
         maxZoom: 15,
         /* копия обязательна: reduce мутирует аккумулятор, а он же — массив точки */
         map: (p) => ({ ids: [...p.ids] }),
@@ -156,6 +186,9 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           geometry: { type: 'Point' as const, coordinates: [g.lng, g.lat] },
         })),
       );
+
+      /* зум наружу: по нему меряют размер пина и отлаживают кластеры */
+      if (box.current) box.current.dataset.zoom = m.getZoom().toFixed(2);
 
       const byId = new Map(events.map((e) => [e.id, e]));
       const shown = index.getClusters([-180, -85, 180, 85], Math.round(m.getZoom()));
@@ -203,6 +236,7 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           pins.current.set(key, marker);
         }
         const el = marker.getElement();
+        el.style.setProperty('--pin', `${PIN(m.getZoom())}px`);
         el.classList.toggle('on', g.items.some((i) => i.id === activeId));
         el.classList.toggle('dim', g.items.every((i) => dim.includes(i.id)));
       });
@@ -250,7 +284,9 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
       const half = CARD_W / 2 + 12;
       const x = Math.min(Math.max(p.x, half), w - half);
       const below = p.y < 210;
-      setCard({ x, y: below ? p.y + 34 : p.y - 34, below });
+      /* пин вырос — карточка отодвигается на его радиус, иначе садится на афишу */
+      const r = PIN(m.getZoom()) / 2 + 8;
+      setCard({ x, y: below ? p.y + r : p.y - r, below });
     };
 
     const onMove = () => {
@@ -258,17 +294,33 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
       raf.current = requestAnimationFrame(place);
     };
 
-    place();
-    m.on('move', onMove);
-    m.on('zoom', onMove);
-    m.on('resize', onMove);
+    const where = () => {
+      if (!blank) {
+        setRing(null);
+        return;
+      }
+      const p = m.project([blank.lng, blank.lat]);
+      setRing({ x: p.x, y: p.y });
+    };
+    const onAny = () => {
+      cancelAnimationFrame(raf.current);
+      raf.current = requestAnimationFrame(() => {
+        place();
+        where();
+      });
+    };
+
+    onAny();
+    m.on('move', onAny);
+    m.on('zoom', onAny);
+    m.on('resize', onAny);
     return () => {
       cancelAnimationFrame(raf.current);
-      m.off('move', onMove);
-      m.off('zoom', onMove);
-      m.off('resize', onMove);
+      m.off('move', onAny);
+      m.off('zoom', onAny);
+      m.off('resize', onAny);
     };
-  }, [activeId, open, events, loaded]);
+  }, [activeId, open, blank, events, loaded]);
 
   /* выбранный вечер — в центр, если уехал за край */
   useEffect(() => {
@@ -280,6 +332,76 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
     const out = p.x < pad || p.y < pad || p.x > m.getCanvas().clientWidth - pad || p.y > 420;
     if (out) m.easeTo({ center: [e.lng, e.lat], duration: 450 });
   }, [activeId, events]);
+
+  /* длинное нажатие на карту: новый вечер встаёт ровно в эту точку.
+     Жест не воюет с панорамой: сдвиг больше 10 px гасит удержание. */
+  useEffect(() => {
+    const m = map.current;
+    const el = box.current;
+    if (!m || !el || !loaded) return;
+
+    let timer = 0;
+    let from: { x: number; y: number } | null = null;
+    let fired = 0;
+
+    const stop = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = 0;
+      from = null;
+      setPress(null);
+    };
+
+    const down = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      from = { x: e.clientX, y: e.clientY };
+      const r0 = el.getBoundingClientRect();
+      setPress({ x: e.clientX - r0.left, y: e.clientY - r0.top });
+      timer = window.setTimeout(() => {
+        timer = 0;
+        const r = el.getBoundingClientRect();
+        const p = m.unproject([e.clientX - r.left, e.clientY - r.top]);
+        fired = Date.now();
+        navigator.vibrate?.(15);
+        setPress(null);
+        blankFn.current({ lat: p.lat, lng: p.lng });
+      }, HOLD);
+    };
+
+    const move = (e: PointerEvent) => {
+      if (!from) return;
+      if (Math.abs(e.clientX - from.x) > SLOP || Math.abs(e.clientY - from.y) > SLOP) stop();
+    };
+
+    /* после удержания браузер всё равно шлёт click — он открыл бы чужой вечер под пальцем */
+    const swallow = (e: MouseEvent) => {
+      if (Date.now() - fired > 700) return;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    const menu = (e: Event) => e.preventDefault();
+
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+    el.addEventListener('pointerleave', stop);
+    el.addEventListener('click', swallow, true);
+    el.addEventListener('contextmenu', menu);
+    m.on('dragstart', stop);
+    m.on('zoomstart', stop);
+    return () => {
+      stop();
+      el.removeEventListener('pointerdown', down);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', stop);
+      el.removeEventListener('pointercancel', stop);
+      el.removeEventListener('pointerleave', stop);
+      el.removeEventListener('click', swallow, true);
+      el.removeEventListener('contextmenu', menu);
+      m.off('dragstart', stop);
+      m.off('zoomstart', stop);
+    };
+  }, [loaded]);
 
   const active = open ? events.find((e) => e.id === activeId) ?? null : null;
   const stat = active
@@ -298,6 +420,10 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
       <div ref={box} className="lmap" aria-label="Карта вечеров" />
       {!loaded && <span className="lmap-load">карта загружается…</span>}
 
+      {/* кольцо растёт, пока держишь: видно, что жест поймался и где встанет вечер */}
+      {press && <span key={`${press.x}-${press.y}`} className="lpress" style={{ left: press.x, top: press.y }} />}
+      {ring && <span className="lring" style={{ left: ring.x, top: ring.y }} />}
+
       {active && card && (
         <div
           className={`pincard ${card.below ? 'below' : ''}`}
@@ -314,7 +440,7 @@ export default function LiveMap({ events, dim = [], activeId, open, onPick, onCo
           </div>
           <div className="ps">{stat}</div>
           <div className="pa">{byline}</div>
-          <Link className="go" href={`/e/${active.id}/`}>
+          <Link className="go" href={active.href ?? `/e/${active.id}/`}>
             открыть
           </Link>
           <i className="tail" />

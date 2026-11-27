@@ -5,8 +5,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Lightbox from './Lightbox';
 import PreEvent from './PreEvent';
 import Shell from './Shell';
-import { asset, eventFor, frames, moments, sources, type Photo } from '@/lib/data';
-import { useCopy } from '@/lib/client';
+import Tile from './Tile';
+import { asset, eventFor, frames, moments, periodsOf, sources } from '@/lib/data';
+import { readUploaded, useCopy } from '@/lib/client';
 
 type Tab = 'all' | 'photo' | 'guest';
 
@@ -20,8 +21,12 @@ export default function EventView({ id }: { id: string }) {
   const [open, setOpen] = useState<number | null>(null);
   const [sheet, setSheet] = useState(false);
   const [find, setFind] = useState(false);
+  /* время гостя появляется только после его загрузки: EXIF знает, когда снят кадр */
+  const [wasThere, setWasThere] = useState<string | null>(null);
   const feed = useRef<HTMLDivElement | null>(null);
   const { done: copied, copy } = useCopy();
+
+  useEffect(() => setWasThere(readUploaded(event.id)), [event.id]);
 
   const list = useMemo(
     () =>
@@ -33,6 +38,14 @@ export default function EventView({ id }: { id: string }) {
     [tab, period, event],
   );
 
+  /* чипс обязан считать кадры выбранной категории: под «фотограф» их 96, а не 168 */
+  const chips = useMemo(() => {
+    const from = event.periods[0]?.from ?? 0;
+    const to = event.periods.at(-1)?.to ?? 0;
+    const seen = new Map(periodsOf(event.photos, from, to, tab === 'all' ? undefined : tab).map((p) => [p.id, p.count]));
+    return event.periods.map((p) => ({ ...p, count: seen.get(p.id) ?? 0 }));
+  }, [event, tab]);
+
   /* Esc закрывает верхний слой: сначала лайтбокс, потом лист. Иначе с мыши путь назад один — мимо листа. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -40,10 +53,14 @@ export default function EventView({ id }: { id: string }) {
       if (open !== null) setOpen(null);
       else if (sheet) setSheet(false);
       else if (find) setFind(false);
+      else if (selecting) {
+        setSelecting(false);
+        setPicked([]);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, sheet, find]);
+  }, [open, sheet, find, selecting]);
 
   const toggle = (id: number) =>
     setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -51,6 +68,11 @@ export default function EventView({ id }: { id: string }) {
   const tap = (id: number) => {
     if (selecting) toggle(id);
     else setOpen(list.findIndex((p) => p.id === id));
+  };
+
+  const long = (id: number) => {
+    setSelecting(true);
+    setPicked((prev) => (prev.includes(id) ? prev : [...prev, id]));
   };
 
   /* выбранное скачивается: по файлу на кадр, без сервера */
@@ -70,11 +92,13 @@ export default function EventView({ id }: { id: string }) {
   };
 
   /* «Найти себя»: лист по времени, потому что время — единственное, что гость помнит точно */
-  const around = event.periods.find((p) => {
-    const [h, m] = event.wasThere.split(':').map(Number);
-    const t = (h % 24) * 60 + m;
-    return t >= p.from && t < p.to;
-  });
+  const around = wasThere
+    ? event.periods.find((p) => {
+        const [h, m] = wasThere.split(':').map(Number);
+        const t = (h % 24) * 60 + m;
+        return t >= p.from && t < p.to;
+      })
+    : undefined;
 
   const showPeriod = (id: string | null) => {
     setPeriod(id);
@@ -109,6 +133,8 @@ export default function EventView({ id }: { id: string }) {
     );
   }
 
+  const total = list.length;
+
   return (
     <Shell
       active="Вечер"
@@ -121,14 +147,22 @@ export default function EventView({ id }: { id: string }) {
         </>
       }
     >
+      <div className="ehead">
+        <Link className="rb" href="/" aria-label="На карту">
+          ‹
+        </Link>
+        <span className="sp" />
+        <Link className="up" href="/u/">
+          <i>↑</i> Загрузить
+        </Link>
+        <button className="qr" onClick={() => setSheet(true)} aria-label="Ссылка и QR">
+          QR
+        </button>
+      </div>
+
       <div className="cover">
         <div className="img2" style={{ backgroundImage: `url(${event.cover})` }} />
         <div className="grad" />
-        <div className="bar2">
-          <Link className="rb" href="/" aria-label="Назад на карту">
-            ‹
-          </Link>
-        </div>
         <div className="txt">
           <div className="t">{event.title}</div>
           <div className="l">
@@ -156,7 +190,7 @@ export default function EventView({ id }: { id: string }) {
 
       <div className="strip">
         <div className="chips">
-          {event.periods.map((p) => (
+          {chips.map((p) => (
             <button
               key={p.id}
               className={`chip2 ${period === p.id ? 'on' : ''}`}
@@ -173,15 +207,36 @@ export default function EventView({ id }: { id: string }) {
             <button className="fake" onClick={() => setPeriod(null)}>
               сбросить фильтр
             </button>
-          ) : (
+          ) : wasThere ? (
             <button className="find" onClick={() => setFind(true)}>
-              Найти себя · вы были в {event.wasThere}
+              Найти себя · вы были в {wasThere}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
-      <div className="feed" ref={feed}>
+      <div
+        className="feed"
+        ref={feed}
+        style={selecting ? { paddingBottom: 66 } : undefined}
+      >
+        {/* категория над кадрами: она же остаётся на экране, пока листаешь */}
+        <div className="flab">
+          {tab === 'all' ? 'всё' : tab === 'photo' ? 'фотограф' : 'гости'}
+          <b>{frames(total)}</b>
+        </div>
+
+        {total === 0 && (
+          <div className="fempty">
+            <b>Здесь пусто</b>
+            <span>
+              {chips.some((c) => c.count > 0)
+                ? 'В этом периоде нет кадров этой категории. Сбросьте фильтр.'
+                : 'Кадров этой категории в вечере нет.'}
+            </span>
+          </div>
+        )}
+
         {chunks(list).map((group) => (
           <div key={group[0].id} data-period={group[0].period ?? ''}>
             <div
@@ -200,7 +255,13 @@ export default function EventView({ id }: { id: string }) {
               return (
                 <div className="row3" key={row}>
                   {slice.map((q) => (
-                    <Thumb key={q.id} photo={q} picked={picked.includes(q.id)} onTap={tap} />
+                    <Tile
+                      key={q.id}
+                      photo={q}
+                      picked={picked.includes(q.id)}
+                      onTap={tap}
+                      onLong={long}
+                    />
                   ))}
                 </div>
               );
@@ -209,41 +270,29 @@ export default function EventView({ id }: { id: string }) {
         ))}
       </div>
 
-      <div className="foot">
-        <button className="ghost2" onClick={() => setSheet(true)}>
-          Ссылка
-        </button>
-        {selecting && picked.length > 0 ? (
-          <button className="ghost2 on" onClick={savePicked}>
-            Скачать {picked.length}
-          </button>
-        ) : (
+      {selecting && (
+        <div className="selbar">
+          <span className="n">{picked.length > 0 ? `${picked.length} выбрано` : 'держите кадр'}</span>
           <button
             className="ghost2"
             onClick={() => {
-              setSelecting(!selecting);
+              setSelecting(false);
               setPicked([]);
             }}
           >
-            {selecting ? 'Готово' : 'Выбрать'}
+            Готово
           </button>
-        )}
-        <span className="cnt">{picked.length > 0 ? `${picked.length} выбрано` : event.window}</span>
-        <button
-          className="dl"
-          onClick={() => setOpen(0)}
-          aria-label="Смотреть кадры"
-          title="Смотреть кадры"
-        >
-          ▸
-        </button>
-      </div>
+          <button className="primary" disabled={picked.length === 0} onClick={savePicked}>
+            Скачать {picked.length || ''}
+          </button>
+        </div>
+      )}
 
       {open !== null && (
         <Lightbox photos={list} start={open} onClose={() => setOpen(null)} />
       )}
 
-      {find && (
+      {find && wasThere && (
         <>
           <button className="scrim" onClick={() => setFind(false)} aria-label="Закрыть" />
           <div className="sheet">
@@ -254,7 +303,7 @@ export default function EventView({ id }: { id: string }) {
               откроется на этих часах.
             </div>
             <div className="chips">
-              {event.periods.map((p) => (
+              {chips.map((p) => (
                 <button
                   key={p.id}
                   className={`chip2 ${period === p.id ? 'on' : ''}`}
@@ -267,14 +316,14 @@ export default function EventView({ id }: { id: string }) {
             </div>
             <div className="row2">
               <button className="primary" onClick={() => showPeriod(around?.id ?? event.periods[0]?.id ?? null)}>
-                Кадры вокруг {event.wasThere}
+                Кадры вокруг {wasThere}
               </button>
               <button className="ghost2" onClick={() => showPeriod(null)}>
                 Весь вечер
               </button>
             </div>
             <div className="hint3">
-              Были в {event.wasThere} — это отрезок {around?.label ?? event.window}.
+              Были в {wasThere} — это отрезок {around?.label ?? event.window}.
             </div>
           </div>
         </>
@@ -309,32 +358,6 @@ export default function EventView({ id }: { id: string }) {
     </Shell>
   );
 }
-
-function Thumb({
-  photo,
-  picked,
-  onTap,
-}: {
-  photo: Photo;
-  picked: boolean;
-  onTap: (id: number) => void;
-}) {
-  return (
-    <button
-      className={`th ${picked ? 'picked' : ''}`}
-      onClick={() => onTap(photo.id)}
-      aria-label={`кадр ${photo.time}, ${photo.source === 'guest' ? 'гость' : 'фотограф'}`}
-    >
-      <span className="im" style={{ backgroundImage: `url(${photo.img})`, backgroundPosition: photo.pos }} />
-      {photo.source === 'guest' && <span className="g">гость</span>}
-      {photo.likes > 40 && <span className="lk">♥ {photo.likes}</span>}
-      {picked && <span className="sel">✓</span>}
-    </button>
-  );
-}
-
-const clock = (m: number) =>
-  `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 
 function chunks<T>(items: T[], size = 6): T[][] {
   const out: T[][] = [];

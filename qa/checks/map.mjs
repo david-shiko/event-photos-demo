@@ -316,9 +316,11 @@ export default [
       await h.go('/');
       await h.waitFor(() => !!document.querySelector('.lstack'), 45000, 'стопка пинов');
       await stable(h.page, '.lstack');
-      const want = await h.page.$eval('.lstack b', (el) => Number(el.textContent));
-      h.ok(want >= 5, `в стопке ${want} вечеров, ждали ≥5`);
-      await h.click(h.page, '.lstack');
+      /* стопок теперь много (2+ в пятне): берём самую большую и сверяем её же число */
+      const counts = await h.page.$$eval('.lstack b', (els) => els.map((el) => Number(el.textContent)));
+      const want = Math.max(...counts);
+      h.ok(want >= 5, `в самой большой стопке ${want} вечеров, ждали ≥5`);
+      await h.click(h.page, '.lstack', counts.indexOf(want));
       await h.waitFor(() => !!document.querySelector('.sheet.clist'), 6000, 'лист стопки');
       const rows = await h.page.$$eval('.sheet.clist .srow', (els) => els.length);
       /* лист показывает первые 15, в заголовке — полное число */

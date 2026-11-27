@@ -66,9 +66,13 @@ export default function Shell({
         </div>
       </div>
 
-      <button className="fab" onClick={() => setMenu(true)} aria-label="Экраны демо">
-        ☰
-      </button>
+      {/* Демо-переключатель живёт только на карте — там он как элемент слоёв карты.
+          На остальных экранах он бы лежал поверх кадров и кнопок; выйти с них есть куда. */}
+      {active === 'Карта' && (
+        <button className="fab" onClick={() => setMenu(true)} aria-label="Экраны демо">
+          ☰ Экраны
+        </button>
+      )}
       {menu && (
         <div className="menu" onClick={() => setMenu(false)}>
           <div className="in" onClick={(e) => e.stopPropagation()}>

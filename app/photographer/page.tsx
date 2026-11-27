@@ -46,6 +46,9 @@ export default function Page() {
       }
     >
       <div className="top">
+        <Link className="rb" href="/" aria-label="На карту">
+          ‹
+        </Link>
         <span className="ttl">Ваши вечера</span>
         <span className="act">Смирнова А.</span>
       </div>

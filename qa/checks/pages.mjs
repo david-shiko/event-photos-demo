@@ -69,8 +69,8 @@ export default [
     name: 'вечер: назад на карту',
     run: async (h) => {
       await h.go('/e/7kd2qf9xm/');
-      await h.waitFor(() => !!document.querySelector('.bar2 .rb'), 15000, 'стрелка назад');
-      await h.click(h.page, '.bar2 .rb');
+      await h.waitFor(() => !!document.querySelector('.ehead .rb'), 15000, 'стрелка назад');
+      await h.click(h.page, '.ehead .rb');
       await h.sleep(900);
       const href = await h.page.evaluate(() => location.pathname);
       h.eq(href, `${h.prefix}/`, 'адрес после «назад»');

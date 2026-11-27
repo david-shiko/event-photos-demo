@@ -1,5 +1,5 @@
-// Проверки правок аудита 27 ноября: пустой вечер, 404, адрес созданного вечера,
-// «найти себя», Esc, сходимость цифр, имена у плитки.
+// Проверки правок 27 ноября: пустой вечер, 404, шапка вечера, счётчики категорий,
+// выбор длинным нажатием, «найти себя» только после загрузки, пины и точка создания.
 export default [
   {
     name: '404: по-русски и с выходом',
@@ -35,39 +35,112 @@ export default [
     },
   },
   {
-    name: 'кабинет: созданный вечер открывает себя',
+    name: 'вечер: шапка держит загрузку, внизу ничего не висит',
     run: async (h) => {
-      await h.go('/new');
-      await h.waitFor(() => document.querySelectorAll('.cta').length > 0, 15000, 'шаг 1');
-      await h.click(h.page, '.cta');
-      await h.waitFor(() => /Оплатить/.test(document.body.innerText), 8000, 'шаг 2');
-      await h.click(h.page, '.cta');
-      await h.waitFor(() => !!document.querySelector('.okc'), 10000, 'экран «Готово»');
-      const title = await h.page.evaluate(() => document.querySelector('.okc')?.innerText ?? '');
-      await h.go('/photographer/');
-      await h.waitFor(() => document.querySelectorAll('.cab .ev').length > 0, 15000, 'карточки');
-      const href = await h.page.$eval('.cab .ev', (el) => el.getAttribute('href'));
-      h.ok(href.includes('/e/demo/?id='), `карточка созданного вечера ведёт не туда: ${href}`);
-      await h.click(h.page, '.cab .ev');
-      await h.sleep(900);
-      const s = await h.page.evaluate(() => ({
-        url: location.pathname + location.search,
-        text: document.body.innerText.replace(/\s+/g, ' '),
-        tiles: document.querySelectorAll('.th').length,
-      }));
-      h.ok(s.url.includes('/e/demo/'), `адрес созданного вечера: ${s.url}`);
-      h.eq(s.tiles, 0, 'в новом вечере сразу 168 кадров');
-      h.ok(/Свадьба Маши и Кости/.test(s.text), 'созданный вечер открылся без своего названия');
-      h.ok(!/Свадьба Ани/.test(s.text), 'созданный вечер открылся как чужой');
-      h.ok(/как только|кадров пока нет|кадры ещё не залиты/i.test(s.text), 'нет честного «кадров ещё нет»');
-      return title;
+      await h.go('/e/7kd2qf9xm/');
+      await h.waitFor(() => document.querySelectorAll('.feed .th').length > 0, 15000, 'лента');
+      const s = await h.page.evaluate(() => {
+        const up = document.querySelector('.ehead .up');
+        const box = up?.getBoundingClientRect();
+        return {
+          up: (up?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+          href: up?.getAttribute('href') ?? '',
+          top: box?.y ?? -1,
+          tall: box?.height ?? 0,
+          foot: !!document.querySelector('.foot'),
+          select: [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Выбрать'),
+        };
+      });
+      h.ok(/Загрузить/.test(s.up), `в шапке не «Загрузить»: «${s.up}»`);
+      h.ok(/\/u\/?$/.test(s.href), `загрузка ведёт не туда: ${s.href}`);
+      h.ok(s.top >= 0 && s.top < 70, `загрузка не вверху экрана: y=${s.top.toFixed(0)}`);
+      h.ok(s.tall >= 44, `кнопка загрузки ${s.tall.toFixed(0)} px, ждали ≥44`);
+      h.ok(!s.foot, 'внизу снова висит панель');
+      h.ok(!s.select, 'кнопка «Выбрать» вернулась');
     },
   },
   {
-    name: 'найти себя: лист сужает ленту по времени',
+    name: 'счётчики: чипсы считают выбранную категорию',
     run: async (h) => {
       await h.go('/e/7kd2qf9xm/');
       await h.waitFor(() => document.querySelectorAll('.chip2').length > 0, 15000, 'чипсы');
+      const read = () =>
+        h.page.evaluate(() => {
+          const tabs = [...document.querySelectorAll('.tab')].map((t) => t.textContent?.replace(/\D+/g, ''));
+          const chips = [...document.querySelectorAll('.chip2')].map((c) => Number(c.querySelector('b')?.textContent ?? -1));
+          return { tabs: tabs.map(Number), chips, sum: chips.reduce((a, b) => a + b, 0) };
+        });
+      const all = await read();
+      h.eq(all.sum, all.tabs[0], 'сумма чипсов против «всё»');
+
+      await h.click(h.page, '.tab', 1);
+      await h.sleep(300);
+      const photo = await read();
+      h.eq(photo.sum, photo.tabs[1], `под «фотограф» чипсы дают ${photo.sum}, а вкладка ${photo.tabs[1]}`);
+      h.ok(photo.sum < all.sum, 'чипсы не изменились после выбора категории');
+
+      await h.click(h.page, '.tab', 2);
+      await h.sleep(300);
+      const guest = await read();
+      h.eq(guest.sum, guest.tabs[2], `под «гости» чипсы дают ${guest.sum}, а вкладка ${guest.tabs[2]}`);
+      h.eq(photo.sum + guest.sum, all.sum, 'фотограф + гости не дают «всё»');
+    },
+  },
+  {
+    name: 'выбор кадров: длинное нажатие вместо кнопки',
+    run: async (h) => {
+      await h.go('/e/7kd2qf9xm/');
+      await h.waitFor(() => document.querySelectorAll('.feed .th').length > 3, 15000, 'лента');
+      const at = async (i) => {
+        const b = await h.boxOf(h.page, '.feed .th', i);
+        return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+      };
+      const first = await at(0);
+      await h.page.mouse.move(first.x, first.y);
+      await h.page.mouse.down();
+      await h.sleep(700);
+      await h.page.mouse.up();
+      await h.sleep(350);
+      const s = await h.page.evaluate(() => ({
+        selbar: !!document.querySelector('.selbar'),
+        lb: !!document.querySelector('.lb'),
+        picked: document.querySelectorAll('.th.picked').length,
+        text: document.querySelector('.selbar')?.innerText.replace(/\s+/g, ' ').trim() ?? '',
+      }));
+      h.ok(!s.lb, 'длинное нажатие открыло лайтбокс вместо выбора');
+      h.ok(s.selbar, 'панель выбора не появилась');
+      h.eq(s.picked, 1, 'выбранных кадров после удержания');
+      h.ok(/1 выбрано/.test(s.text), `в панели нет счёта: «${s.text}»`);
+
+      const second = await at(1);
+      await h.page.mouse.click(second.x, second.y);
+      await h.sleep(250);
+      h.eq(await h.page.$$eval('.th.picked', (els) => els.length), 2, 'кадров после обычного тапа');
+      h.ok(!(await h.page.$('.lb')), 'обычный тап в режиме выбора открыл лайтбокс');
+
+      await h.click(h.page, '.selbar .ghost2');
+      await h.sleep(300);
+      h.ok(!(await h.page.$('.selbar')), '«Готово» не закрыло выбор');
+      h.eq(await h.page.$$eval('.th.picked', (els) => els.length), 0, 'выбор не сбросился');
+    },
+  },
+  {
+    name: 'найти себя: только после своей загрузки',
+    run: async (h) => {
+      await h.go('/e/7kd2qf9xm/');
+      await h.page.evaluate(() => window.localStorage.clear());
+      await h.go('/e/7kd2qf9xm/');
+      await h.waitFor(() => document.querySelectorAll('.tab').length > 0, 15000, 'вкладки');
+      h.ok(!(await h.page.$('.hint2 .find')), '«найти себя» висит у гостя, который ничего не заливал');
+
+      await h.go('/u/');
+      await h.waitFor(() => !!document.querySelector('.drop .pick'), 15000, 'экран загрузки');
+      await h.click(h.page, '.drop .pick');
+      await h.click(h.page, '.pickline .go');
+      await h.waitFor(() => /Спасибо/.test(document.body.innerText), 30000, 'загрузка гостя');
+
+      await h.go('/e/7kd2qf9xm/');
+      await h.waitFor(() => !!document.querySelector('.hint2 .find'), 15000, 'кнопка «найти себя»');
       const all = await h.page.$$eval('.feed .th', (els) => els.length);
       await h.click(h.page, '.hint2 .find');
       await h.waitFor(() => /Найти себя/.test(document.body.innerText), 4000, 'лист «Найти себя»');
@@ -86,6 +159,115 @@ export default [
     },
   },
   {
+    name: 'пины: размер под палец',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin:not(.lstack)').length > 0, 45000, 'пины');
+      /* пин въезжает с анимацией scale(0.4 -> 1): мерить надо после неё */
+      await h.sleep(900);
+      const s = await h.page.evaluate(() => {
+        const pin = document.querySelector('.lpin:not(.lstack):not(.hide)');
+        const circle = pin?.querySelector('.pc');
+        const stack = document.querySelector('.lstack');
+        const box = (el) => (el ? el.getBoundingClientRect() : null);
+        return {
+          pin: box(pin)?.width ?? 0,
+          circle: box(circle)?.width ?? 0,
+          stack: stack ? box(stack)?.width ?? 0 : -1,
+        };
+      });
+      /* было 38 внутри и 42 под палец; на общем плане города 48, на близком 78 */
+      h.ok(s.pin >= 56, `зона пина ${s.pin} px, ждали ≥56`);
+      h.ok(s.circle >= 48, `круг пина ${s.circle} px, ждали ≥48`);
+      h.ok(s.stack === -1 || s.stack >= 64, `стопка ${s.stack} px, ждали ≥64`);
+
+      /* на близком плане пин ещё крупнее: жмём «плюс», колесо в headless даёт ползума */
+      for (let i = 0; i < 5; i++) {
+        await h.click(h.page, '.maplibregl-ctrl-zoom-in');
+        await h.sleep(420);
+      }
+      await h.sleep(900);
+      const near = await h.page.evaluate(() => {
+        const zoom = Number(document.querySelector('.lmap')?.dataset.zoom ?? 0);
+        const el = document.querySelector('.lpin, .lstack');
+        return { zoom, w: el ? el.getBoundingClientRect().width : 0 };
+      });
+      h.ok(near.zoom >= 14.2, `зум не доехал: ${near.zoom}`);
+      h.ok(near.w >= 74, `на близком плане пин ${near.w} px, ждали ≥74`);
+    },
+  },
+  {
+    name: 'карта: удержание создаёт вечер ровно в этой точке',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin, .lstack').length > 0, 45000, 'пины');
+      /* держим пустое место карты: не пин, не шапка, не панель */
+      const spot = await h.page.evaluate(() => {
+        const c = document.querySelector('.maplibregl-canvas');
+        if (!c) return null;
+        const r = c.getBoundingClientRect();
+        for (let fy = 0.2; fy <= 0.55; fy += 0.05) {
+          for (let fx = 0.2; fx <= 0.85; fx += 0.06) {
+            const x = Math.round(r.x + r.width * fx);
+            const y = Math.round(r.y + r.height * fy);
+            const el = document.elementFromPoint(x, y);
+            if (el && el.classList.contains('maplibregl-canvas')) return { x, y };
+          }
+        }
+        return null;
+      });
+      h.ok(!!spot, 'не нашёл пустого места на карте');
+      await h.page.mouse.move(spot.x, spot.y);
+      await h.page.mouse.down();
+      await h.sleep(300);
+      const hold = await h.page.evaluate(() => !!document.querySelector('.lpress'));
+      await h.sleep(500);
+      await h.page.mouse.up();
+      await h.sleep(500);
+      h.ok(hold, 'кольцо удержания не появилось — жест не видно');
+      const text = await h.page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
+      h.ok(/Новый вечер здесь/.test(text), `лист точки не открылся: ${text.slice(0, 120)}`);
+      h.ok(!(await h.page.$('.pincard')), 'удержание открыло чужой вечер');
+
+      await h.click(h.page, '.sheet .row2 .primary');
+      await h.sleep(900);
+      const s = await h.page.evaluate(() => ({ url: location.pathname + location.search, text: document.body.innerText }));
+      h.ok(/\/new\//.test(s.url), `создание не открылось: ${s.url}`);
+      h.ok(/at=/.test(s.url), `точка не передалась в создание: ${s.url}`);
+      h.ok(/точка с карты/.test(s.text), 'в форме нет отметки, откуда точка');
+
+      await h.click(h.page, '.cta');
+      await h.waitFor(() => /Оплатить/.test(document.body.innerText), 8000, 'шаг 2');
+      await h.click(h.page, '.cta');
+      await h.waitFor(() => !!document.querySelector('.okc'), 12000, 'экран «Готово»');
+      await h.click(h.page, '.ufoot a.ghost2', 0);
+      await h.waitFor(() => !!document.querySelector('.pincard'), 45000, 'пин созданного вечера');
+      const card = await h.page.$eval('.pincard .pt', (el) => el.textContent ?? '');
+      h.ok(/Свадьба Маши и Кости/.test(card), `на карте не тот вечер: ${card}`);
+    },
+  },
+  {
+    name: 'кабинет: созданный вечер открывает себя',
+    run: async (h) => {
+      await h.go('/photographer/');
+      await h.waitFor(() => document.querySelectorAll('.cab .ev').length > 0, 15000, 'карточки');
+      const href = await h.page.$eval('.cab .ev', (el) => el.getAttribute('href'));
+      h.ok(href.includes('/e/demo/?id='), `карточка созданного вечера ведёт не туда: ${href}`);
+      await h.click(h.page, '.cab .ev');
+      await h.sleep(900);
+      const s = await h.page.evaluate(() => ({
+        url: location.pathname + location.search,
+        text: document.body.innerText.replace(/\s+/g, ' '),
+        tiles: document.querySelectorAll('.th').length,
+      }));
+      h.ok(s.url.includes('/e/demo/'), `адрес созданного вечера: ${s.url}`);
+      h.eq(s.tiles, 0, 'в новом вечере сразу 168 кадров');
+      h.ok(/Свадьба Маши и Кости/.test(s.text), 'созданный вечер открылся без своего названия');
+      h.ok(!/Свадьба Ани/.test(s.text), 'созданный вечер открылся как чужой');
+      h.ok(/как только|кадров пока нет|кадры ещё не залиты/i.test(s.text), 'нет честного «кадров ещё нет»');
+    },
+  },
+  {
     name: 'Esc закрывает лайтбокс и лист',
     run: async (h) => {
       await h.go('/e/7kd2qf9xm/');
@@ -95,7 +277,7 @@ export default [
       await h.page.keyboard.press('Escape');
       await h.sleep(400);
       h.ok(!(await h.page.$('.lb')), 'Esc не закрыл лайтбокс');
-      await h.click(h.page, '.foot .ghost2', 0);
+      await h.click(h.page, '.ehead .qr');
       await h.waitFor(() => !!document.querySelector('.sheet'), 5000, 'лист «Ссылка и QR»');
       await h.page.keyboard.press('Escape');
       await h.sleep(400);
