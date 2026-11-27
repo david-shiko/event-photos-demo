@@ -137,6 +137,67 @@ export default [
     },
   },
   {
+    name: 'пин: название висит под ним вплотную и не расползается',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin:not(.lstack)').length > 1, 45000, 'пины');
+      await sleep(1100);
+      const s = await h.page.evaluate(() => {
+        const out = [];
+        for (const el of document.querySelectorAll('.lpin:not(.lstack):not(.hide)')) {
+          const chip = el.querySelector('.nm');
+          const circle = el.querySelector('.pc');
+          if (!chip || !circle) continue;
+          if (getComputedStyle(chip).opacity === '0') continue;
+          const c = chip.getBoundingClientRect();
+          const p = circle.getBoundingClientRect();
+          out.push({
+            gap: Math.round(c.top - p.bottom),
+            off: Math.round(c.left + c.width / 2 - (p.left + p.width / 2)),
+            w: Math.round(c.width),
+            h: Math.round(c.height),
+            text: chip.textContent ?? '',
+          });
+        }
+        return out;
+      });
+      h.ok(s.length > 0, 'ни на одном пине нет названия');
+      for (const l of s) {
+        h.ok(l.gap >= -1 && l.gap <= 4, `подпись «${l.text}» в ${l.gap} px от пина, ждали вплотную`);
+        h.ok(Math.abs(l.off) <= 2, `подпись «${l.text}» съехала от центра пина на ${l.off} px`);
+        h.ok(l.w <= 162, `подпись «${l.text}» шириной ${l.w} px — расползлась по карте`);
+        h.ok(l.text.length <= 41, `название в ${l.text.length} символов — не ограничили`);
+        h.ok(l.h <= 52, `подпись «${l.text}» высотой ${l.h} px — строк больше трёх`);
+      }
+    },
+  },
+  {
+    name: 'карточка пина: название не повторяется под пином',
+    run: async (h) => {
+      await h.go('/');
+      await h.waitFor(() => document.querySelectorAll('.lpin:not(.lstack)').length > 0, 45000, 'пины');
+      await sleep(1100);
+      const pin = await hitPin(h.page);
+      h.ok(!!pin, 'ни по одному пину не попасть курсором');
+      await h.page.mouse.click(pin.x, pin.y);
+      await h.waitFor(() => !!document.querySelector('.pincard'), 6000, 'карточка вечера');
+      await sleep(500);
+      const s = await h.page.evaluate(() => {
+        const card = document.querySelector('.pincard');
+        const title = card?.querySelector('.pt')?.textContent ?? '';
+        const chip = document.querySelector('.lpin.on .nm');
+        /* все видимые места с названием: карточка и подписи пинов */
+        const seen = [...document.querySelectorAll('.pincard .pt, .lpin .nm')].filter(
+          (el) => el.textContent === title && getComputedStyle(el).opacity !== '0',
+        ).length;
+        return { title, seen, chip: chip ? getComputedStyle(chip).opacity : null };
+      });
+      h.ok(s.title.length > 2, 'в карточке нет названия вечера');
+      h.eq(s.seen, 1, 'название вечера видно сразу в нескольких местах');
+      h.eq(s.chip, '0', 'подпись под выбранным пином осталась — дубль названия');
+    },
+  },
+  {
     name: 'карточка пина: приклеена к пину и едет вместе с картой',
     run: async (h) => {
       await h.go('/');

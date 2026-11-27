@@ -100,25 +100,38 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* название — часть пина: висит под кружком вплотную (2 px), чтобы не занимать карту.
+   Ширина и три строки заданы здесь, символы режет JS: длинный заголовок не спамит карту. */
 .lpin .nm {
   position: absolute;
   left: 50%;
-  top: calc(var(--pin, 52px) + 20px);
+  top: calc(var(--pin, 52px) + 6px);
   transform: translateX(-50%);
-  white-space: nowrap;
-  background: var(--ink);
-  color: #fff;
-  font-size: 11.5px;
+  width: max-content;
+  max-width: 152px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 3px 10px rgba(20, 18, 14, 0.13);
+  color: var(--ink);
+  font-size: 10.5px;
   font-weight: 600;
-  padding: 4px 9px;
-  border-radius: 8px;
-  opacity: 0;
-  pointer-events: none;
+  line-height: 1.26;
+  letter-spacing: -0.005em;
+  text-align: center;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   transition: opacity 0.15s;
 }
 
+/* подпись уступает соседям: в каждой группе место занимает первая (флаг ставит JS) */
+.lpin .nm.nm-off { opacity: 0; pointer-events: none; }
+
 .lpin.on .pc { border-color: var(--ink); }
-.lpin.on .nm { opacity: 1; }
 .lpin.on { z-index: 500; }
 
 .lpin.soon .pc {
@@ -154,21 +167,8 @@
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
-.lstack .nm {
-  opacity: 0;
-  transition: opacity 0.15s;
-  position: absolute;
-  left: 50%;
-  top: calc(var(--pin, 52px) + 20px);
-  transform: translateX(-50%);
-  white-space: nowrap;
-  background: var(--ink);
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 4px 9px;
-  border-radius: 8px;
-}
+/* у стопки названия нет: счётчик и так занимает место, подписи соседей стояли бы друг на друге */
+.lstack .nm { display: none; }
 
 /* ---------- удержание на карте ---------- */
 /* кольцо заполняется ровно за HOLD: видно, что жест поймался, и видно где */
@@ -252,6 +252,7 @@
   border-top: 1px solid var(--line);
 }
 .pincard .pt { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; padding-right: 18px; }
+.pincard .pl { font-size: 10.5px; color: var(--mut); margin-top: 3px; }
 /* стрелка говорит «тапни ещё раз»: кнопки «открыть» нет */
 .pincard .ar {
   position: absolute;
@@ -261,7 +262,6 @@
   font-size: 15px;
   line-height: 1;
 }
-.pincard .pl { font-size: 10.5px; color: var(--mut); margin-top: 3px; }
 .pincard .ps { font-size: 11px; color: #3f3d38; margin-top: 7px; }
 .pincard .pa { font-size: 10.5px; color: var(--mut); margin-top: 2px; }
 

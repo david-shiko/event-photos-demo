@@ -38,8 +38,14 @@ const PIN = (zoom: number) =>
   2 * Math.round(Math.max(48, Math.min(78, 48 + (zoom - 11) * 7.2)) / 2);
 /* под пальцем кнопка, пин или карточка — это уже не «пустое место» */
 const BUSY = 'a, button, .maplibregl-ctrl, .maplibregl-marker';
+/* название под пином режем по символам: длинный заголовок расползается по карте */
+const MAP_NAME = 40;
+const mapName = (s: string) => (s.length > MAP_NAME ? `${s.slice(0, MAP_NAME - 1).trimEnd()}…` : s);
 
 type Group = { items: MapEvent[]; lat: number; lng: number };
+
+const overlap = (a: DOMRect, b: DOMRect) =>
+  a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 
 const spread = (items: MapEvent[]): Group => ({
   items,
@@ -79,10 +85,42 @@ export default function LiveMap({
   const initial = useRef(events);
   const observer = useRef<ResizeObserver | null>(null);
   const startZoom = useRef(13);
+  /* выбранный вечер читаем из ref: подписи расставляются без пересборки пинов */
+  const activeRef = useRef<string | null>(activeId);
+  activeRef.current = activeId;
   pick.current = onPick;
   cluster.current = onCluster;
   blankFn.current = onBlank;
   collapse.current = onCollapse;
+
+  /* подпись под пином не должна наезжать на соседние пины и на другие подписи.
+     Коллизии MapLibre считает только для symbol-слоёв, а пины здесь — DOM-маркеры,
+     поэтому расставляем жадно по экранным прямоугольникам: первый занял, второй уступил. */
+  const placeNames = () => {
+    const marks = [...pins.current.values()].map((mk) => mk.getElement());
+    if (!marks.length) return;
+    const view = box.current?.getBoundingClientRect();
+    const sel = activeRef.current;
+    const circles = new Map(marks.map((el) => [el, el.getBoundingClientRect()]));
+    const taken: DOMRect[] = [];
+    for (const el of marks) {
+      if (el.classList.contains('lstack')) continue;
+      const chip = el.querySelector<HTMLElement>('.nm');
+      if (!chip) continue;
+      /* открытая карточка называет вечер сама: подпись под пином уступает ей место */
+      if (sel && el.dataset.ids?.split('+').includes(sel)) {
+        chip.classList.add('nm-off');
+        continue;
+      }
+      chip.classList.remove('nm-off');
+      const r = chip.getBoundingClientRect();
+      /* обрезанная краем экрана подпись читается как мусор — лучше не показывать */
+      const cut = !!view && (r.left < view.left + 2 || r.right > view.right - 2);
+      const clash = taken.some((t) => overlap(r, t)) || marks.some((o) => o !== el && overlap(r, circles.get(o)!));
+      if (clash || cut) chip.classList.add('nm-off');
+      else taken.push(r);
+    }
+  };
 
   useEffect(() => {
     let dead = false;
@@ -240,7 +278,7 @@ export default function LiveMap({
             const venues = new Set(g.items.map((i) => i.venue));
             const label = venues.size > 1 ? 'Москва' : lead.venue;
             el.dataset.venue = lead.venue;
-            el.innerHTML = `<b>${g.items.length}</b><span class="nm">${label}</span>`;
+            el.innerHTML = `<b>${g.items.length}</b><span class="nm">${mapName(label)}</span>`;
             el.addEventListener('click', () => cluster.current(g.items));
           } else {
             const time = lead.when.split(', ')[1]?.split('–')[0] ?? '';
@@ -248,7 +286,7 @@ export default function LiveMap({
               `<span class="pc" ${lead.locked ? '' : `style="background-image:url('${lead.img}')"`}>` +
               `${lead.locked ? '⌂' : ''}</span>` +
               (lead.frames > 0 ? `<b>${lead.frames}</b>` : lead.soon ? `<b class="t">${time}</b>` : '') +
-              `<span class="nm">${lead.title}</span>`;
+              `<span class="nm">${mapName(lead.title)}</span>`;
             el.addEventListener('click', () => pick.current(lead.id));
           }
           marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([g.lng, g.lat]).addTo(m);
@@ -258,6 +296,8 @@ export default function LiveMap({
         el.style.setProperty('--pin', `${PIN(m.getZoom())}px`);
         el.classList.toggle('dim', g.items.every((i) => dim.includes(i.id)));
       });
+
+      placeNames();
     };
 
     sync();
@@ -270,6 +310,8 @@ export default function LiveMap({
       const mm = map.current;
       if (!mm || hooked) return;
       mm.on('zoomend', onZoom);
+      /* подписи переезжают вместе с пинами: край экрана и соседи меняются и при панораме */
+      mm.on('moveend', placeNames);
       hooked = true;
     };
     const onReady = () => {
@@ -281,7 +323,10 @@ export default function LiveMap({
     return () => {
       dead = true;
       window.removeEventListener('lmap-ready', onReady);
-      if (hooked) map.current?.off('zoomend', onZoom);
+      if (hooked) {
+        map.current?.off('zoomend', onZoom);
+        map.current?.off('moveend', placeNames);
+      }
     };
   }, [events, dim]);
 
@@ -294,6 +339,7 @@ export default function LiveMap({
       const on = activeId ? el.dataset.ids?.split('+').includes(activeId) : false;
       el.classList.toggle('on', !!on);
     });
+    placeNames();
   }, [activeId, open, events]);
 
   /* карточка — маркер карты: её двигает та же трансформация, что и пин,
@@ -528,13 +574,15 @@ export default function LiveMap({
       {ring && <span className="lring" style={{ left: ring.x, top: ring.y }} />}
 
       {/* карточка целиком — ссылка: второй тап по ней уже открывает вечер,
-          кнопки «открыть» и крестика нет (закрывает тап по пустой карте) */}
+          кнопки «открыть» и крестика нет (закрывает тап по пустой карте).
+          Название одно: пока карточка открыта, оно здесь, а подпись под пином уходит. */}
       {active &&
         cardHost &&
         createPortal(
           <Link
             key={active.id}
             className={`pincard ${below ? 'below' : ''}`}
+            data-id={active.id}
             href={active.href ?? `/e/${active.id}/`}
             aria-label={`Открыть ${active.title}`}
           >
