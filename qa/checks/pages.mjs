@@ -108,7 +108,7 @@ export default [
       await h.sleep(900);
       /* у демо-вечера адрес с параметром ?id=, поэтому сверяем путь вместе с запросом */
       const path = await h.page.evaluate(() => location.pathname + location.search);
-      h.eq(path, id.replace(h.prefix, ''), 'адрес после клика по карточке вечера');
+      h.eq(path, id, 'адрес после клика по карточке вечера');
     },
   },
   {

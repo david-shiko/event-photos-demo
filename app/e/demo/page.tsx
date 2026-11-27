@@ -67,7 +67,7 @@ export default function Page() {
         title={ev.title}
         venue={ev.venue}
         when={ev.when}
-        cover={ev.cover ?? asset('/img/p4.jpg')}
+        cover={asset(ev.cover ?? '/img/p4.jpg')}
         kind="created"
         shareId={ev.id}
       />
