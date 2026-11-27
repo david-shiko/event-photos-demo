@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import Link from 'next/link';
 import Supercluster from 'supercluster';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { asset, plural, type MapEvent } from '@/lib/data';
 
 export type Blank = { lat: number; lng: number };
@@ -26,17 +27,16 @@ const CENTER: [number, number] = [37.628, 55.7505];
 /* два и больше вечера в одном пятне — стопка (design.md §3.5).
    Одиночный пин из кластера прятал соседей: их не было видно и некуда нажать. */
 const STACK_MIN = 2;
-const CARD_W = 252;
 /* держим 600 мс: короче — срабатывает при панораме, длиннее — палец устаёт */
 const HOLD = 600;
 const SLOP = 10;
 /* пин растёт с зумом: на общем плане города он 48, на близком — 78.
    Верхняя граница — «в два раза крупнее прежних 38» (design.md §3.3). */
 const PIN = (zoom: number) => Math.round(Math.max(48, Math.min(78, 48 + (zoom - 11) * 7.2)));
-const NEAR = 14.2;
+/* под пальцем кнопка, пин или карточка — это уже не «пустое место» */
+const BUSY = 'a, button, .maplibregl-ctrl, .maplibregl-marker';
 
 type Group = { items: MapEvent[]; lat: number; lng: number };
-type Card = { x: number; y: number; below: boolean };
 
 const spread = (items: MapEvent[]): Group => ({
   items,
@@ -57,24 +57,29 @@ export default function LiveMap({
 }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<import('maplibre-gl').Map | null>(null);
+  const lib = useRef<typeof import('maplibre-gl') | null>(null);
   const pins = useRef<Map<string, import('maplibre-gl').Marker>>(new Map());
   const groups = useRef<Group[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [card, setCard] = useState<Card | null>(null);
+  /* карточка живёт в маркере карты, поэтому её положение задаёт не React, а сама карта */
+  const [cardHost, setCardHost] = useState<HTMLDivElement | null>(null);
+  const [below, setBelow] = useState(false);
+  const cardMark = useRef<import('maplibre-gl').Marker | null>(null);
   /* кольцо под пальцем, пока идёт удержание */
   const [press, setPress] = useState<{ x: number; y: number } | null>(null);
   const [ring, setRing] = useState<{ x: number; y: number } | null>(null);
   const pick = useRef(onPick);
   const cluster = useRef(onCluster);
   const blankFn = useRef(onBlank);
+  const collapse = useRef(onCollapse);
   const ready = useRef(false);
   const initial = useRef(events);
   const observer = useRef<ResizeObserver | null>(null);
-  const raf = useRef(0);
   const startZoom = useRef(13);
   pick.current = onPick;
   cluster.current = onCluster;
   blankFn.current = onBlank;
+  collapse.current = onCollapse;
 
   useEffect(() => {
     let dead = false;
@@ -96,7 +101,16 @@ export default function LiveMap({
         touchPitch: false,
       });
       map.current = m;
+      lib.current = maplibregl;
       m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+      /* нажатие по пустому месту закрывает карточку — обычное поведение карты.
+         Клик по пину или карточке приходит сюда же через контейнер: его не трогаем. */
+      m.on('click', (e) => {
+        const t = e.originalEvent?.target;
+        if (t instanceof Element && t.closest('.maplibregl-marker')) return;
+        collapse.current();
+      });
 
       const ro = new ResizeObserver(() => m.resize());
       ro.observe(box.current);
@@ -268,81 +282,122 @@ export default function LiveMap({
   }, [events, activeId, dim]);
 
 
-  /* карточка висит над выбранным пином и едет вместе с картой */
+  /* карточка — маркер карты: её двигает та же трансформация, что и пин,
+     иначе она отстаёт от пина на кадр и «плывёт» при панораме.
+     Сторону (над пином или под ним) пересчитываем только в конце жеста. */
   useEffect(() => {
     const m = map.current;
-    if (!m) return;
+    const L = lib.current;
+    if (!m || !L) return;
+    const e = open ? events.find((x) => x.id === activeId) : null;
+
+    if (!e) {
+      cardMark.current?.remove();
+      cardMark.current = null;
+      return;
+    }
+
+    if (!cardMark.current) {
+      const host = document.createElement('div');
+      host.className = 'pincard-host';
+      cardMark.current = new L.Marker({ element: host, anchor: 'center' })
+        .setLngLat([e.lng, e.lat])
+        .addTo(m);
+      setCardHost(host);
+    }
+    const mark = cardMark.current;
+    mark.setLngLat([e.lng, e.lat]);
+    const host = mark.getElement();
+    /* карточка шире пина: у края экрана её сдвигаем внутрь, а хвостик оставляем на пине */
+    const shift = () => {
+      const w = m.getCanvas().clientWidth;
+      const half = 126 + 12;
+      const p = m.project([e.lng, e.lat]);
+      const x = Math.min(Math.max(p.x, half), w - half);
+      host.style.setProperty('--shift', `${Math.round(x - p.x)}px`);
+    };
 
     const place = () => {
-      const e = events.find((x) => x.id === activeId);
-      if (!e || !open) {
-        setCard(null);
-        return;
-      }
-      const p = m.project([e.lng, e.lat]);
-      const w = m.getCanvas().clientWidth;
-      const half = CARD_W / 2 + 12;
-      const x = Math.min(Math.max(p.x, half), w - half);
-      const below = p.y < 210;
-      /* пин вырос — карточка отодвигается на его радиус, иначе садится на афишу */
       const r = PIN(m.getZoom()) / 2 + 8;
-      setCard({ x, y: below ? p.y + r : p.y - r, below });
+      const p = m.project([e.lng, e.lat]);
+      /* у верхнего края места над пином нет — карточка идёт под него */
+      const down = p.y < 210;
+      mark.setOffset([0, down ? r : -r]);
+      setBelow(down);
+      shift();
     };
 
+    let raf = 0;
     const onMove = () => {
-      cancelAnimationFrame(raf.current);
-      raf.current = requestAnimationFrame(place);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(shift);
     };
 
-    const where = () => {
-      if (!blank) {
-        setRing(null);
-        return;
-      }
-      const p = m.project([blank.lng, blank.lat]);
-      setRing({ x: p.x, y: p.y });
+    place();
+    m.on('move', onMove);
+    m.on('moveend', place);
+    m.on('zoomend', place);
+    m.on('resize', place);
+    return () => {
+      cancelAnimationFrame(raf);
+      m.off('move', onMove);
+      m.off('moveend', place);
+      m.off('zoomend', place);
+      m.off('resize', place);
     };
-    const onAny = () => {
-      cancelAnimationFrame(raf.current);
-      raf.current = requestAnimationFrame(() => {
-        place();
-        where();
+  }, [activeId, open, events]);
+
+  /* точка создания держится за картой сама: кольцо — обычный DOM, его надо двигать */
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !blank) {
+      setRing(null);
+      return;
+    }
+    let id = 0;
+    const show = () => {
+      cancelAnimationFrame(id);
+      id = requestAnimationFrame(() => {
+        const p = m.project([blank.lng, blank.lat]);
+        setRing({ x: p.x, y: p.y });
       });
     };
-
-    onAny();
-    m.on('move', onAny);
-    m.on('zoom', onAny);
-    m.on('resize', onAny);
+    show();
+    m.on('move', show);
+    m.on('zoom', show);
+    m.on('resize', show);
     return () => {
-      cancelAnimationFrame(raf.current);
-      m.off('move', onAny);
-      m.off('zoom', onAny);
-      m.off('resize', onAny);
+      cancelAnimationFrame(id);
+      m.off('move', show);
+      m.off('zoom', show);
+      m.off('resize', show);
     };
-  }, [activeId, open, blank, events, loaded]);
+  }, [blank, loaded]);
 
-  /* выбранный вечер — в центр, если уехал за край */
+  /* выбранный вечер — в центр, если уехал за край.
+     Отступ по бокам больше половины карточки: она шире пина и иначе липнет к краю. */
   useEffect(() => {
     const e = events.find((x) => x.id === activeId);
     const m = map.current;
     if (!m || !e || !ready.current) return;
     const p = m.project([e.lng, e.lat]);
-    const pad = 80;
-    const out = p.x < pad || p.y < pad || p.x > m.getCanvas().clientWidth - pad || p.y > 420;
+    const pad = 140;
+    const out = p.x < pad || p.y < 120 || p.x > m.getCanvas().clientWidth - pad || p.y > 420;
     if (out) m.easeTo({ center: [e.lng, e.lat], duration: 450 });
   }, [activeId, events]);
 
-  /* длинное нажатие на карту: новый вечер встаёт ровно в эту точку.
-     Жест не воюет с панорамой: сдвиг больше 10 px гасит удержание. */
+  /* длинное нажатие на пустую карту: новый вечер встаёт ровно в эту точку.
+     Жест уступает панораме, пинчу и любому элементу под пальцем. */
   useEffect(() => {
     const m = map.current;
     const el = box.current;
     if (!m || !el || !loaded) return;
 
     let timer = 0;
-    let from: { x: number; y: number } | null = null;
+    let from: { id: number; x: number; y: number } | null = null;
     let fired = 0;
+    /* пальцы на экране: второй — это уже пинч, удержание уступает */
+    const fingers = new Set<number>();
 
     const stop = () => {
       if (timer) window.clearTimeout(timer);
@@ -353,11 +408,22 @@ export default function LiveMap({
 
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      from = { x: e.clientX, y: e.clientY };
+      fingers.add(e.pointerId);
+      if (fingers.size > 1) {
+        stop();
+        return;
+      }
+      if ((e.target as Element | null)?.closest(BUSY)) return;
+      if (timer) window.clearTimeout(timer);
+      const id = e.pointerId;
+      from = { id, x: e.clientX, y: e.clientY };
       const r0 = el.getBoundingClientRect();
       setPress({ x: e.clientX - r0.left, y: e.clientY - r0.top });
       timer = window.setTimeout(() => {
         timer = 0;
+        /* таймер, переживший свой палец, не должен ничего создавать */
+        if (from?.id !== id) return;
+        from = null;
         const r = el.getBoundingClientRect();
         const p = m.unproject([e.clientX - r.left, e.clientY - r.top]);
         fired = Date.now();
@@ -368,8 +434,17 @@ export default function LiveMap({
     };
 
     const move = (e: PointerEvent) => {
-      if (!from) return;
+      if (!from || e.pointerId !== from.id) return;
       if (Math.abs(e.clientX - from.x) > SLOP || Math.abs(e.clientY - from.y) > SLOP) stop();
+    };
+
+    const up = (e: PointerEvent) => {
+      fingers.delete(e.pointerId);
+      if (from?.id === e.pointerId) stop();
+    };
+
+    const leave = (e: PointerEvent) => {
+      if (from?.id === e.pointerId) stop();
     };
 
     /* после удержания браузер всё равно шлёт click — он открыл бы чужой вечер под пальцем */
@@ -382,22 +457,25 @@ export default function LiveMap({
 
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', stop);
-    el.addEventListener('pointercancel', stop);
-    el.addEventListener('pointerleave', stop);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('pointerleave', leave);
     el.addEventListener('click', swallow, true);
     el.addEventListener('contextmenu', menu);
+    /* панорама и зум гасят удержание, даже если палец почти не сдвинулся */
+    m.on('movestart', stop);
     m.on('dragstart', stop);
     m.on('zoomstart', stop);
     return () => {
       stop();
       el.removeEventListener('pointerdown', down);
       el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', stop);
-      el.removeEventListener('pointercancel', stop);
-      el.removeEventListener('pointerleave', stop);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      el.removeEventListener('pointerleave', leave);
       el.removeEventListener('click', swallow, true);
       el.removeEventListener('contextmenu', menu);
+      m.off('movestart', stop);
       m.off('dragstart', stop);
       m.off('zoomstart', stop);
     };
@@ -424,28 +502,29 @@ export default function LiveMap({
       {press && <span key={`${press.x}-${press.y}`} className="lpress" style={{ left: press.x, top: press.y }} />}
       {ring && <span className="lring" style={{ left: ring.x, top: ring.y }} />}
 
-      {active && card && (
-        <div
-          className={`pincard ${card.below ? 'below' : ''}`}
-          style={{ left: card.x, top: card.y }}
-          role="dialog"
-          aria-label={active.title}
-        >
-          <button className="x" onClick={onCollapse} aria-label="Свернуть карточку">
-            ×
-          </button>
-          <div className="pt">{active.title}</div>
-          <div className="pl">
-            {active.venue} · {active.when.split(', ')[1]}
-          </div>
-          <div className="ps">{stat}</div>
-          <div className="pa">{byline}</div>
-          <Link className="go" href={active.href ?? `/e/${active.id}/`}>
-            открыть
-          </Link>
-          <i className="tail" />
-        </div>
-      )}
+      {/* карточка целиком — ссылка: второй тап по ней уже открывает вечер,
+          кнопки «открыть» и крестика нет (закрывает тап по пустой карте) */}
+      {active &&
+        cardHost &&
+        createPortal(
+          <Link
+            className={`pincard ${below ? 'below' : ''}`}
+            href={active.href ?? `/e/${active.id}/`}
+            aria-label={`Открыть ${active.title}`}
+          >
+            <span className="ar" aria-hidden="true">
+              ›
+            </span>
+            <div className="pt">{active.title}</div>
+            <div className="pl">
+              {active.venue} · {active.when.split(', ')[1]}
+            </div>
+            <div className="ps">{stat}</div>
+            <div className="pa">{byline}</div>
+            <i className="tail" />
+          </Link>,
+          cardHost,
+        )}
     </>
   );
 }

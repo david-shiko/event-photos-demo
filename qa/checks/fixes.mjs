@@ -179,7 +179,8 @@ export default [
       /* было 38 внутри и 42 под палец; на общем плане города 48, на близком 78 */
       h.ok(s.pin >= 56, `зона пина ${s.pin} px, ждали ≥56`);
       h.ok(s.circle >= 48, `круг пина ${s.circle} px, ждали ≥48`);
-      h.ok(s.stack === -1 || s.stack >= 64, `стопка ${s.stack} px, ждали ≥64`);
+      /* стопка теперь того же размера, что круг пина: разный размер читался как разный предмет */
+      h.ok(s.stack === -1 || s.stack >= 48, `стопка ${s.stack} px, ждали ≥48`);
 
       /* на близком плане пин ещё крупнее: жмём «плюс», колесо в headless даёт ползума */
       for (let i = 0; i < 5; i++) {
@@ -229,7 +230,7 @@ export default [
       h.ok(/Новый вечер здесь/.test(text), `лист точки не открылся: ${text.slice(0, 120)}`);
       h.ok(!(await h.page.$('.pincard')), 'удержание открыло чужой вечер');
 
-      await h.click(h.page, '.sheet .row2 .primary');
+      await h.click(h.page, '.sheet .solo');
       await h.sleep(900);
       const s = await h.page.evaluate(() => ({ url: location.pathname + location.search, text: document.body.innerText }));
       h.ok(/\/new\//.test(s.url), `создание не открылось: ${s.url}`);

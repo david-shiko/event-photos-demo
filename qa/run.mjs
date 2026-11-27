@@ -1,9 +1,10 @@
 // npm run qa: играет собранный сайт настоящей мышью и падает, если что-то не реагирует.
 import { serveSite } from './serve.mjs';
-import { openSite, click, boxOf, dragX, touchSwipe, waitFor, sleep } from './browser.mjs';
+import { openSite, click, boxOf, dragX, touchSwipe, pinch, hold, waitFor, sleep } from './browser.mjs';
 import map from './checks/map.mjs';
 import pages from './checks/pages.mjs';
 import fixes from './checks/fixes.mjs';
+import touch from './checks/touch.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 // QA_BASE=https://... — прогон по живому сайту вместо локальной сборки.
@@ -23,6 +24,8 @@ const ctx = {
   boxOf,
   dragX: (box, dx, yInSet) => dragX(page, box, dx, yInSet),
   touchSwipe: (box, dx) => touchSwipe(page, box, dx),
+  pinch: (spot, from, to) => pinch(page, spot, from, to),
+  hold: (x, y, ms) => hold(page, x, y, ms),
   waitFor: (fn, timeout, label) => waitFor(page, fn, timeout, label),
   sleep,
   errors,
@@ -44,7 +47,11 @@ const ctx = {
 
 const results = [];
 mkdirSync(SHOTS, { recursive: true });
-for (const check of [...map, ...pages, ...fixes]) {
+/* QA_ONLY=подстрока — прогнать только нужные проверки, пока чинишь одно место */
+const only = process.env.QA_ONLY ?? '';
+const all = [...map, ...pages, ...fixes, ...touch];
+const suite = only ? all.filter((c) => c.name.includes(only)) : all;
+for (const check of suite) {
   const t0 = Date.now();
   try {
     await check.run(ctx);

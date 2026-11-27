@@ -1,3 +1,4 @@
+import { stubMap } from './mapstub.mjs';
 import { chromium } from 'playwright-core';
 import { existsSync } from 'node:fs';
 
@@ -39,6 +40,8 @@ export async function openSite(url, opts = {}) {
     ...(opts.video ? { recordVideo: { dir: opts.videoDir ?? 'qa-shots/video', size: { width: 390, height: 844 } } } : {}),
   });
   const page = await context.newPage();
+  /* QA_MAP=stub — прогнать механику без чужого тайл-сервера (см. mapstub.mjs) */
+  if (process.env.QA_MAP) await stubMap(page);
   /* GitHub Pages через прокси отдаёт документ по 10–20 секунд */
   page.setDefaultNavigationTimeout(75000);
   page.setDefaultTimeout(20000);
@@ -112,6 +115,36 @@ export async function touchSwipe(page, box, dx, yInSet = 45, steps = 12) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
   await sleep(800);
+}
+
+// Пинч двумя пальцами. Второй палец — главный подозреваемый в ложном удержании:
+// он приходит отдельным pointerdown и может пережить жест.
+export async function pinch(page, spot, from = 70, to = 190, steps = 10) {
+  const cdp = await page.context().newCDPSession(page);
+  const pts = (d) => [
+    { x: Math.round(spot.x - d / 2), y: Math.round(spot.y), id: 1 },
+    { x: Math.round(spot.x + d / 2), y: Math.round(spot.y), id: 2 },
+  ];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(from) });
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: pts(from + ((to - from) * i) / steps),
+    });
+    await sleep(60);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  await sleep(900);
+}
+
+// Удержание мышью в точке: палец вниз, ждём, отпускаем.
+export async function hold(page, x, y, ms = 800) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await sleep(ms);
+  await page.mouse.up();
+  await sleep(600);
 }
 
 export async function waitFor(page, fn, timeout = 20000, label = 'условие', arg) {

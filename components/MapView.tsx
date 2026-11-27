@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Shell from './Shell';
 import LiveMap, { type Blank } from './LiveMap';
+import Sheet from './Sheet';
 import DayStrip from './DayStrip';
 import TimeRail from './TimeRail';
 import { asset, clockOf, DAYS, eventSpan, frames, mapEvents, plural, sources, type MapEvent } from '@/lib/data';
@@ -199,53 +200,38 @@ export default function MapView() {
       </div>
 
       {blank && (
-        <>
-          <button className="scrim" onClick={() => setBlank(null)} aria-label="Отмена" />
-          <div className="sheet">
-            <div className="grab" />
-            <div className="st">Новый вечер здесь</div>
-            <div className="hint3 left">
-              {near && near.d < 400
-                ? `Зал тот же — «${near.e.venue}», ${near.d} м. Но вечер будет ваш: чужие кадры сюда не попадут.`
-                : 'Вокруг никого. Вечер встанет ровно в эту точку и появится на карте со своей афишей.'}
-            </div>
-            <div className="row2">
-              <button className="primary" onClick={createHere}>
-                Создать вечер здесь
-              </button>
-              <button className="ghost2" onClick={() => setBlank(null)}>
-                Отмена
-              </button>
-            </div>
-            <div className="hint3">
-              Дальше — название, дата и 690 ₽. Ссылка и QR появятся сразу после оплаты.
-            </div>
+        <Sheet onClose={() => setBlank(null)} closeLabel="Отмена">
+          <div className="st">Новый вечер здесь</div>
+          <div className="hint3 left">
+            {near && near.d < 400
+              ? `Зал тот же — «${near.e.venue}», ${near.d} м. Но вечер будет ваш: чужие кадры сюда не попадут.`
+              : 'Вокруг никого. Вечер встанет ровно в эту точку и появится на карте со своей афишей.'}
           </div>
-        </>
+          <button className="primary solo" onClick={createHere}>
+            Создать вечер здесь
+          </button>
+          <div className="hint3">Дальше — название, дата и 690 ₽. Ссылка и QR появятся сразу после оплаты.</div>
+        </Sheet>
       )}
 
       {cluster && (
-        <>
-          <button className="scrim" onClick={() => setCluster(null)} aria-label="Закрыть" />
-          <div className="sheet clist">
-            <div className="grab" />
-            <div className="st">
-              {cluster[0].venue} · {cluster.length} {plural(cluster.length, 'вечер', 'вечера', 'вечеров')}
-            </div>
-            {cluster.slice(0, 15).map((e) => (
-              <button key={e.id} className="srow" onClick={() => pickPin(e.id)}>
-                <span className="cv" style={{ backgroundImage: `url(${e.img})` }} />
-                <span className="m">
-                  <b>{e.title}</b>
-                  <i>
-                    {e.when.split(', ')[1]} · {e.frames > 0 ? frames(e.frames) : 'кадров пока нет'}
-                  </i>
-                </span>
-                <span className="ch">›</span>
-              </button>
-            ))}
+        <Sheet onClose={() => setCluster(null)} className="clist">
+          <div className="st">
+            {cluster[0].venue} · {cluster.length} {plural(cluster.length, 'вечер', 'вечера', 'вечеров')}
           </div>
-        </>
+          {cluster.slice(0, 15).map((e) => (
+            <button key={e.id} className="srow" onClick={() => pickPin(e.id)}>
+              <span className="cv" style={{ backgroundImage: `url(${e.img})` }} />
+              <span className="m">
+                <b>{e.title}</b>
+                <i>
+                  {e.when.split(', ')[1]} · {e.frames > 0 ? frames(e.frames) : 'кадров пока нет'}
+                </i>
+              </span>
+              <span className="ch">›</span>
+            </button>
+          ))}
+        </Sheet>
       )}
 
     </Shell>
