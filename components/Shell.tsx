@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { mapEvents, frames } from '@/lib/data';
+import { mapEvents, evenings, frames } from '@/lib/data';
 
 const NAV = [
   { href: '/', label: 'Карта', icon: '1' },
@@ -43,7 +43,7 @@ export default function Shell({
             <br />в одной ссылке.
           </h1>
           <div className="proof">
-            <b>{total}</b> кадров · <b>{mapEvents.length}</b> вечеров · <b>{people}</b> человек
+            <b>{total}</b> кадров · <b>{evenings(mapEvents.length)}</b> · <b>{people}</b> человек
             снимали
             <span>одна ночь в Москве, 11 июля</span>
           </div>
@@ -79,7 +79,7 @@ export default function Shell({
               </Link>
             ))}
             <div className="sub">
-              {frames(total)} с {mapEvents.length} вечеров. Демо на мок-данных, фото — заглушки.
+              {frames(total)} с {mapEvents.length} вечеров. Демо на мок-данных, фото — Unsplash, CC0.
             </div>
           </div>
         </div>

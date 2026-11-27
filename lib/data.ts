@@ -549,15 +549,20 @@ export type Ev = {
   wasThere: string;
   photos: Photo[];
   periods: Period[];
+  /** опубликован — ссылка показывает кадры; draft — кадров ещё нет, отдаём «готовится» */
+  state: 'published' | 'draft';
 };
 
-/** Данные вечера по id: счётчики, куски вечера и кадры под них. */
+/** Доля гостевых кадров: остальное снял фотограф. */
+export const guestsOf = (n: number) => n - Math.round((n * 4) / 7);
+
+/** Данные вечера по id: счётчики, куски вечера и кадры под них. Черновик кадров не выдумывает. */
 export function eventFor(id: string): Ev {
   const m = mapEvents.find((e) => e.id === id) ?? mapEvents[0];
-  const n = m.frames > 0 ? m.frames : 168;
+  const n = m.frames;
   const { from, to } = parseWindow(m.when);
-  const buckets = spread(n, from, to);
   const [datePart, timePart] = m.when.split(', ');
+  const photos = n > 0 ? makePhotos(spread(n, from, to), from) : [];
   const photographer = Math.round((n * 4) / 7);
   return {
     id: m.id,
@@ -566,12 +571,13 @@ export function eventFor(id: string): Ev {
     date: datePart,
     window: timePart,
     counts: { all: n, photographer, guests: n - photographer },
-    sources: m.sources || 7,
+    sources: m.sources,
     cover: m.id === '7kd2qf9xm' ? asset('/img/big.jpg') : m.img,
     city: 'Москва',
     wasThere: '21:40',
-    photos: makePhotos(buckets, from),
-    periods: periodsFor(makePhotos(buckets, from), from, to),
+    photos,
+    periods: photos.length ? periodsFor(photos, from, to) : [],
+    state: n > 0 ? 'published' : 'draft',
   };
 }
 
@@ -609,7 +615,7 @@ export const cabinet = {
     {
       id: 'ny-tochki',
       title: 'Новогодний корпоратив',
-      date: '20 декабря',
+      date: '31 декабря',
       state: 'черновик',
       frames: 0,
       sources: 0,
@@ -619,6 +625,14 @@ export const cabinet = {
       img: asset('/img/p4.jpg'),
     },
   ],
+};
+
+/** Итоги месяца считаются из вечеров, а не пишутся руками: иначе цифры расходятся с экраном вечера. */
+export const cabinetTotals = {
+  views: cabinet.events.reduce((s, e) => s + e.views, 0),
+  downloads: cabinet.events.reduce((s, e) => s + e.downloads, 0),
+  guests: cabinet.events.reduce((s, e) => s + guestsOf(e.frames), 0),
+  frames: cabinet.events.reduce((s, e) => s + e.frames, 0),
 };
 
 /** Моменты вечера: подпись к самому запомнившемуся часу. */

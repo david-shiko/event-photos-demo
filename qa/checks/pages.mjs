@@ -106,8 +106,9 @@ export default [
       h.ok(!!id && id.startsWith(`${h.prefix}/e/`), `карточка вечера не ссылка: ${id}`);
       await h.click(h.page, '.cab .ev');
       await h.sleep(900);
-      const path = await h.page.evaluate(() => location.pathname);
-      h.eq(path, id, 'адрес после клика по карточке вечера');
+      /* у демо-вечера адрес с параметром ?id=, поэтому сверяем путь вместе с запросом */
+      const path = await h.page.evaluate(() => location.pathname + location.search);
+      h.eq(path, id.replace(h.prefix, ''), 'адрес после клика по карточке вечера');
     },
   },
   {

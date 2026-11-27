@@ -3,6 +3,7 @@ import { serveSite } from './serve.mjs';
 import { openSite, click, boxOf, dragX, touchSwipe, waitFor, sleep } from './browser.mjs';
 import map from './checks/map.mjs';
 import pages from './checks/pages.mjs';
+import fixes from './checks/fixes.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 // QA_BASE=https://... — прогон по живому сайту вместо локальной сборки.
@@ -43,7 +44,7 @@ const ctx = {
 
 const results = [];
 mkdirSync(SHOTS, { recursive: true });
-for (const check of [...map, ...pages]) {
+for (const check of [...map, ...pages, ...fixes]) {
   const t0 = Date.now();
   try {
     await check.run(ctx);

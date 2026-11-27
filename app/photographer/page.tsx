@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import Shell from '@/components/Shell';
-import { asset, cabinet, frames, sources } from '@/lib/data';
+import { asset, cabinet, cabinetTotals, frames, sources } from '@/lib/data';
 import { readCreated, type Created } from '@/lib/client';
 
 export default function Page() {
@@ -16,11 +16,11 @@ export default function Page() {
   const downloadCsv = () => {
     const rows = [
       ['показатель', 'значение'],
-      ['открыли вечер', '309'],
-      ['дошли до кадров, %', '94'],
-      ['скачали файлов', '88'],
-      ['кадров принесли гости', '41'],
-      ['оплачено за месяц, ₽', '1380'],
+      ['открыли вечер', String(cabinetTotals.views)],
+      ['кадров в вечерах', String(cabinetTotals.frames)],
+      ['скачали файлов', String(cabinetTotals.downloads)],
+      ['кадров принесли гости', String(cabinetTotals.guests)],
+      ['оплачено за месяц, ₽', String(cabinet.paid)],
     ];
     const csv = '\ufeff' + rows.map((r) => r.join(';')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -37,7 +37,7 @@ export default function Page() {
     <Shell
       active="Кабинет"
       title="Кабинет"
-      caption="После вечера остаются не десять чатов, а одна цифра: 88 кадров забрали, 41 кадр принесли гости."
+      caption={`После вечера остаются не десять чатов, а одна цифра: ${cabinetTotals.downloads} кадров забрали, ${cabinetTotals.guests} принесли гости.`}
       note={
         <>
           <b>Главная боль.</b> Фотограф собирает гостевые кадры руками — часы переписки на каждый
@@ -74,7 +74,7 @@ export default function Page() {
         <div className="sec">Вечера</div>
 
         {created.map((e) => (
-          <Link className="ev" key={e.id} href="/e/7kd2qf9xm/">
+          <Link className="ev" key={e.id} href={`/e/demo/?id=${e.id}`}>
             <div className="r">
               <div className="im" style={{ backgroundImage: `url(${asset('/img/p4.jpg')})` }} />
               <div>
@@ -148,20 +148,20 @@ export default function Page() {
             <div className="st">Отчёт за ноябрь</div>
             <div className="rep">
               <div>
-                <b>309</b>
+                <b>{cabinetTotals.views}</b>
                 <span>открыли вечер</span>
               </div>
               <div>
-                <b>94 %</b>
-                <span>дошли до кадров</span>
+                <b>{cabinetTotals.frames}</b>
+                <span>кадров в вечерах</span>
               </div>
               <div>
-                <b>88</b>
+                <b>{cabinetTotals.downloads}</b>
                 <span>скачали файлы</span>
               </div>
               <div>
-                <b>41</b>
-                <span>кадр принесли гости</span>
+                <b>{cabinetTotals.guests}</b>
+                <span>кадров принесли гости</span>
               </div>
             </div>
             <div className="reph">

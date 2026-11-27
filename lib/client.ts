@@ -9,6 +9,7 @@ export type Created = {
   title: string;
   venue: string;
   when: string;
+  cover?: string;
 };
 
 const KEY = 'ep.created';

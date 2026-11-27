@@ -38,6 +38,13 @@ export function serveSite(root = ROOT, prefix = '') {
     }
     if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
     if (!existsSync(file)) {
+      /* как GitHub Pages: неизвестный адрес отдаёт 404.html сборки, а не голый текст */
+      const fallback = join(root, '404.html');
+      if (existsSync(fallback) && !path.startsWith('/_next/')) {
+        res.writeHead(404, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        createReadStream(fallback).pipe(res);
+        return;
+      }
       res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
       return;
     }

@@ -35,7 +35,7 @@ export default function Creator() {
   const pay = () => {
     setPaying(true);
     timer.current = setTimeout(() => {
-      saveCreated({ id: 'mk7f2q', code: '6391', title: f.title, venue: f.venue, when: f.date });
+      saveCreated({ id: 'mk7f2q', code: '6391', title: f.title, venue: f.venue, when: f.date, cover: '/img/p4.jpg' });
       setPaying(false);
       setStep(3);
     }, 1500);
@@ -284,8 +284,8 @@ export default function Creator() {
             </div>
 
             <div className="ufoot">
-              <Link className="cta" href="/e/7kd2qf9xm/">
-                Как выглядит вечер
+              <Link className="cta" href="/e/demo/?id=mk7f2q">
+                Открыть вечер
               </Link>
               <Link className="ghost2" style={{ marginTop: 8 }} href="/photographer/">
                 В кабинет

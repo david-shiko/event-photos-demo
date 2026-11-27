@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Lightbox from './Lightbox';
+import PreEvent from './PreEvent';
 import Shell from './Shell';
 import { asset, eventFor, frames, moments, sources, type Photo } from '@/lib/data';
 import { useCopy } from '@/lib/client';
@@ -18,6 +19,8 @@ export default function EventView({ id }: { id: string }) {
   const [selecting, setSelecting] = useState(false);
   const [open, setOpen] = useState<number | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [find, setFind] = useState(false);
+  const feed = useRef<HTMLDivElement | null>(null);
   const { done: copied, copy } = useCopy();
 
   const list = useMemo(
@@ -29,6 +32,18 @@ export default function EventView({ id }: { id: string }) {
       ),
     [tab, period, event],
   );
+
+  /* Esc закрывает верхний слой: сначала лайтбокс, потом лист. Иначе с мыши путь назад один — мимо листа. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (open !== null) setOpen(null);
+      else if (sheet) setSheet(false);
+      else if (find) setFind(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, sheet, find]);
 
   const toggle = (id: number) =>
     setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -53,6 +68,46 @@ export default function EventView({ id }: { id: string }) {
         }, i * 120);
       });
   };
+
+  /* «Найти себя»: лист по времени, потому что время — единственное, что гость помнит точно */
+  const around = event.periods.find((p) => {
+    const [h, m] = event.wasThere.split(':').map(Number);
+    const t = (h % 24) * 60 + m;
+    return t >= p.from && t < p.to;
+  });
+
+  const showPeriod = (id: string | null) => {
+    setPeriod(id);
+    setFind(false);
+    requestAnimationFrame(() => {
+      const el = feed.current?.querySelector(`[data-period="${id ?? ''}"]`) ?? feed.current;
+      el?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  };
+
+  if (event.state === 'draft') {
+    return (
+      <Shell
+        active="Вечер"
+        title="Вечер"
+        caption={`${event.title}: кадров ещё нет. Ссылка уже есть, открывать по ней пока нечего.`}
+        note={
+          <>
+            <b>Пустой вечер — это экран, а не сетка-обманка.</b> Гость по такой ссылке видит дату,
+            площадку и честное «кадры ещё не залиты»; счётчики из воздуха не рисуются.
+          </>
+        }
+      >
+        <PreEvent
+          title={event.title}
+          venue={event.venue}
+          when={`${event.date}, ${event.window}`}
+          cover={event.cover}
+          kind="draft"
+        />
+      </Shell>
+    );
+  }
 
   return (
     <Shell
@@ -119,16 +174,16 @@ export default function EventView({ id }: { id: string }) {
               сбросить фильтр
             </button>
           ) : (
-            <span className="fake">
-              вы были в {event.wasThere}
-            </span>
+            <button className="find" onClick={() => setFind(true)}>
+              Найти себя · вы были в {event.wasThere}
+            </button>
           )}
         </div>
       </div>
 
-      <div className="feed">
+      <div className="feed" ref={feed}>
         {chunks(list).map((group) => (
-          <div key={group[0].id}>
+          <div key={group[0].id} data-period={group[0].period ?? ''}>
             <div
               className={`glab ${
                 moment && group[0].time.slice(0, 2) === moment.time.slice(0, 2) ? 'mom' : ''
@@ -174,13 +229,55 @@ export default function EventView({ id }: { id: string }) {
           </button>
         )}
         <span className="cnt">{picked.length > 0 ? `${picked.length} выбрано` : event.window}</span>
-        <button className="dl" onClick={() => setOpen(0)} aria-label="Кадр">
-          ↓
+        <button
+          className="dl"
+          onClick={() => setOpen(0)}
+          aria-label="Смотреть кадры"
+          title="Смотреть кадры"
+        >
+          ▸
         </button>
       </div>
 
       {open !== null && (
         <Lightbox photos={list} start={open} onClose={() => setOpen(null)} />
+      )}
+
+      {find && (
+        <>
+          <button className="scrim" onClick={() => setFind(false)} aria-label="Закрыть" />
+          <div className="sheet">
+            <div className="grab" />
+            <div className="st">Найти себя</div>
+            <div className="hint3 left">
+              Гость помнит время, а не номер кадра. Выберите, когда вы были на вечере, — лента
+              откроется на этих часах.
+            </div>
+            <div className="chips">
+              {event.periods.map((p) => (
+                <button
+                  key={p.id}
+                  className={`chip2 ${period === p.id ? 'on' : ''}`}
+                  onClick={() => showPeriod(p.id)}
+                >
+                  {p.label}
+                  <b>{p.count}</b>
+                </button>
+              ))}
+            </div>
+            <div className="row2">
+              <button className="primary" onClick={() => showPeriod(around?.id ?? event.periods[0]?.id ?? null)}>
+                Кадры вокруг {event.wasThere}
+              </button>
+              <button className="ghost2" onClick={() => showPeriod(null)}>
+                Весь вечер
+              </button>
+            </div>
+            <div className="hint3">
+              Были в {event.wasThere} — это отрезок {around?.label ?? event.window}.
+            </div>
+          </div>
+        </>
       )}
 
       {sheet && (
@@ -204,7 +301,7 @@ export default function EventView({ id }: { id: string }) {
             <div className="hint3">
               Гости открывают без регистрации и приложения.
               <br />
-              Ссылка работает до 9 октября.
+              Ссылка живёт 90 дней с даты съёмки.
             </div>
           </div>
         </>
@@ -223,7 +320,11 @@ function Thumb({
   onTap: (id: number) => void;
 }) {
   return (
-    <button className={`th ${picked ? 'picked' : ''}`} onClick={() => onTap(photo.id)}>
+    <button
+      className={`th ${picked ? 'picked' : ''}`}
+      onClick={() => onTap(photo.id)}
+      aria-label={`кадр ${photo.time}, ${photo.source === 'guest' ? 'гость' : 'фотограф'}`}
+    >
       <span className="im" style={{ backgroundImage: `url(${photo.img})`, backgroundPosition: photo.pos }} />
       {photo.source === 'guest' && <span className="g">гость</span>}
       {photo.likes > 40 && <span className="lk">♥ {photo.likes}</span>}

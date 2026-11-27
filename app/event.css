@@ -276,3 +276,68 @@
 .tlmom.right b { left: auto; right: 0; transform: none; }
 .tlmom.left b { left: 0; transform: none; }
 .tlfoot button:disabled { opacity: 0.45; }
+
+/* ---------- «найти себя» в строке периодов ---------- */
+.hint2 .find {
+  color: var(--acc); font-weight: 650; background: none; border: 0; padding: 6px 0;
+  font-size: 11px; cursor: pointer; font-family: inherit; min-height: 32px;
+}
+.sheet .hint3.left { text-align: left; margin-top: 6px; }
+
+/* ---------- вечер без кадров ---------- */
+.pre { flex: 1; overflow-y: auto; background: var(--panel); padding: 18px 16px 26px; }
+.pre .ph3 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.pre .pd { font-size: 12.5px; color: #5c5a55; line-height: 1.55; margin-top: 7px; }
+.pre .prel {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 16px; padding: 11px 12px; background: var(--soft); border-radius: 12px;
+  font-size: 11.5px; color: #3f3d38;
+}
+.pre .prel .ghost2 {
+  height: 34px; padding: 0 12px; border-radius: 99px; border: 0; background: var(--panel);
+  font-size: 11.5px; font-weight: 650; cursor: pointer; color: var(--ink);
+}
+.pre .prea { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.pre .prea a {
+  height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 650; text-decoration: none;
+}
+.pre .prea a.p { background: var(--ink); color: #fff; }
+.pre .prea a.ghost2 { background: var(--soft); color: #26282c; }
+.pre .prh { font-size: 11px; color: #8d8a83; line-height: 1.5; margin-top: 14px; }
+.dot-wait { width: 6px; height: 6px; border-radius: 50%; background: #d9a13b; display: inline-block; }
+
+/* ---------- не найдено ---------- */
+.miss { flex: 1; background: var(--panel); padding: 56px 20px 24px; text-align: center; }
+.miss .mt { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
+.miss .md { font-size: 12.5px; color: #5c5a55; line-height: 1.55; margin-top: 8px; }
+.miss .ma { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.miss .ma a {
+  height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 650;
+}
+.miss .ma a.p { background: var(--ink); color: #fff; }
+.miss .ma a.ghost2 { background: var(--soft); color: #26282c; }
+.miss .mh { font-size: 11px; color: #8d8a83; line-height: 1.5; margin-top: 14px; }
+
+/* ---------- цели не мельче 44 ---------- */
+.lb .nav { width: 44px; height: 44px; }
+.lb .rb, .cover .rb { width: 44px; height: 44px; }
+.foot .dl { width: 44px; height: 44px; }
+
+/* ---------- «что дальше» на пустом вечере ---------- */
+.pre .steps3 { margin-top: 18px; border-top: 1px solid var(--soft); }
+.pre .steps3 .s3 { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--soft); }
+.pre .steps3 i {
+  flex: none; width: 19px; height: 19px; border-radius: 50%; background: var(--chip); color: #4a473f;
+  display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+  font-style: normal; margin-top: 1px;
+}
+.pre .steps3 .t3 { font-size: 12px; font-weight: 600; }
+.pre .steps3 .d3 { font-size: 10.5px; color: var(--mut); line-height: 1.4; margin-top: 1px; }
+
+/* ---------- почему не нашлось ---------- */
+.miss .why { margin-top: 20px; text-align: left; border-top: 1px solid var(--soft); }
+.miss .why .w { display: flex; flex-direction: column; gap: 1px; padding: 9px 0; border-bottom: 1px solid var(--soft); }
+.miss .why b { font-size: 11.5px; font-weight: 650; }
+.miss .why span { font-size: 10.5px; color: var(--mut); line-height: 1.4; }
