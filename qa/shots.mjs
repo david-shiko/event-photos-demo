@@ -8,7 +8,11 @@ import { stubMap } from './mapstub.mjs';
 const OUT = process.env.QA_STYLE_OUT ?? '../design/redesign-2026-11-27/touch';
 mkdirSync(OUT, { recursive: true });
 
-const site = await serveSite(undefined, process.env.QA_PREFIX ?? '');
+/* QA_BASE — кадры с живого сайта, иначе со свежей сборки в out/ */
+const remote = process.env.QA_BASE?.replace(/\/$/, '');
+const site = remote
+  ? { server: null, url: remote }
+  : await serveSite(undefined, process.env.QA_PREFIX ?? '');
 const { browser, page, errors } = await openSite(site.url);
 const wide = await browser.newPage({ viewport: { width: 1440, height: 950 } });
 await stubMap(wide);
